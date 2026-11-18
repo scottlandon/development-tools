@@ -12,14 +12,10 @@ pub fn to_i64(n: usize) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
 }
 
-/// A `Vec` index as one of the dataset's `u16` ids (project and model indices). Wraps, as a bare
-/// `as u16` would, above 65535.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "TODO(review): wraps silently with more than 65536 distinct projects or models; the u16 ids are never range-checked"
-)]
-pub fn wrapping_u16_id(ix: usize) -> u16 {
-    ix as u16
+/// A `Vec` index as one of the dataset's `u32` ids (project and model indices), saturating at
+/// `u32::MAX` (unreachable in practice: it would take four billion distinct projects or models).
+pub fn to_u32(n: usize) -> u32 {
+    u32::try_from(n).unwrap_or(u32::MAX)
 }
 
 // Rust's float-to-integer `as` is saturating (NaN becomes 0), which is exactly the clamping

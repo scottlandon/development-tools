@@ -83,12 +83,12 @@ pub struct App {
     pub view: View,
     pub range: Range,
     pub metric: Metric,
-    pub model_filter: Option<u16>,
-    pub project_filter: Option<u16>,
+    pub model_filter: Option<u32>,
+    pub project_filter: Option<u32>,
     pub sess_sort: SessSort,
     pub summary: Summary,
-    pub models_sorted: Vec<(u16, Agg)>,
-    pub projects_sorted: Vec<(u16, Agg)>,
+    pub models_sorted: Vec<(u32, Agg)>,
+    pub projects_sorted: Vec<(u32, Agg)>,
     pub sess_order: Vec<usize>,
     pub theme: ThemeId,
     /// Whether to emit 24-bit colour (else the nearest xterm-256 index).
@@ -156,7 +156,7 @@ impl App {
             Metric::Tokens => a.total() as f64,
         };
         let metric = self.metric;
-        let sort = |v: &Vec<(u16, Agg)>| {
+        let sort = |v: &Vec<(u32, Agg)>| {
             let mut v = v.clone();
             v.sort_by(|a, b| {
                 key(&b.1, metric)
@@ -223,19 +223,24 @@ impl App {
     pub fn on_msg(&mut self, m: Msg) {
         match m {
             Msg::Data(ds) => {
+                // Ids are interned per rebuild in file order, so a new project or model can shift
+                // every later id. Carry each filter across by its stable key (resolved against the
+                // old dataset), and drop it if the new dataset no longer has that model/project.
+                let model_key = self
+                    .model_filter
+                    .and_then(|m| self.ds.models.get(m as usize))
+                    .map(|m| m.name.as_str());
+                let project_key = self
+                    .project_filter
+                    .and_then(|p| self.ds.project_keys.get(p as usize))
+                    .map(String::as_str);
+                let model_filter = model_key.and_then(|k| ds.model_by_name(k));
+                let project_filter = project_key.and_then(|k| ds.project_by_key(k));
+                self.model_filter = model_filter;
+                self.project_filter = project_filter;
                 self.ds = ds;
                 self.have_data = true;
                 self.today = timeutil::today();
-                // Drop filters pointing at ids that no longer exist.
-                if self.model_filter.is_some_and(|m| m as usize >= self.ds.models.len()) {
-                    self.model_filter = None;
-                }
-                if self
-                    .project_filter
-                    .is_some_and(|p| p as usize >= self.ds.projects.len())
-                {
-                    self.project_filter = None;
-                }
                 self.recompute();
             }
             Msg::Scanning(s) => {
@@ -351,12 +356,12 @@ impl App {
                 self.recompute();
             }
             KeyCode::Char('m') => {
-                let opts: Vec<u16> = self.summary.by_model.iter().map(|(m, _)| *m).collect();
+                let opts: Vec<u32> = self.summary.by_model.iter().map(|(m, _)| *m).collect();
                 self.model_filter = Self::cycle(self.model_filter, &opts);
                 self.recompute();
             }
             KeyCode::Char('p') => {
-                let opts: Vec<u16> = self.summary.by_project.iter().map(|(p, _)| *p).collect();
+                let opts: Vec<u32> = self.summary.by_project.iter().map(|(p, _)| *p).collect();
                 self.project_filter = Self::cycle(self.project_filter, &opts);
                 self.recompute();
             }
@@ -493,10 +498,10 @@ mod tests {
 
     #[test]
     fn cycle_wraps_to_none() {
-        assert_eq!(App::cycle(None, &[3u16, 5]), Some(3));
-        assert_eq!(App::cycle(Some(3u16), &[3, 5]), Some(5));
-        assert_eq!(App::cycle(Some(5u16), &[3, 5]), None);
-        assert_eq!(App::cycle(None, &[] as &[u16]), None);
+        assert_eq!(App::cycle(None, &[3u32, 5]), Some(3));
+        assert_eq!(App::cycle(Some(3u32), &[3, 5]), Some(5));
+        assert_eq!(App::cycle(Some(5u32), &[3, 5]), None);
+        assert_eq!(App::cycle(None, &[] as &[u32]), None);
     }
 
     // ----- behaviour with data loaded
@@ -549,13 +554,153 @@ mod tests {
         assert_eq!(a.model_filter, Some(0), "a valid filter survives a rescan");
     }
 
+    // ----- filters across rescans that renumber ids
+
+    const SONNET: &str = "claude-sonnet-5-5";
+    const OPUS: &str = "claude-opus-5-5";
+    const HAIKU: &str = "claude-haiku-5-5";
+
+    /// A transcript file in `project` (encoded dir name) using `model`, with `msgs` messages.
+    /// `seed` keeps message keys distinct across files so none is deduplicated away.
+    fn transcript(project: &str, model: &str, seed: u64, msgs: u64) -> crate::scan::FileEntry {
+        crate::scan::FileEntry {
+            project: project.into(),
+            session: format!("s{seed}"),
+            label: Some(project.trim_start_matches("-Users-me-").into()),
+            models: vec![model.into()],
+            recs: (0..msgs)
+                .map(|k| crate::scan::Rec {
+                    key: seed * 100 + k,
+                    ts: 1_700_000_000 + i64::try_from(seed * 100 + k).unwrap_or(0),
+                    model: 0,
+                    i: 10,
+                    o: 20,
+                    cr: 0,
+                    cw5: 0,
+                    cw1: 0,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    /// Builds a dataset from `(file path, project dir, model, messages)`; the path decides the
+    /// order in which `Dataset::build` interns ids.
+    fn build(files: &[(&str, &str, &str, u64)]) -> Arc<Dataset> {
+        let map = files
+            .iter()
+            .zip(1u64..)
+            .map(|((path, project, model, msgs), seed)| ((*path).to_string(), transcript(project, model, seed, *msgs)))
+            .collect();
+        Arc::new(Dataset::build(&map))
+    }
+
+    fn app_on(ds: Arc<Dataset>) -> App {
+        let mut a = App::new(Range::All);
+        a.on_msg(Msg::Data(ds));
+        a
+    }
+
+    fn selected_project(a: &App) -> &str {
+        &a.ds.projects[a.project_filter.expect("project filter set") as usize]
+    }
+
+    fn selected_model(a: &App) -> &str {
+        &a.ds.models[a.model_filter.expect("model filter set") as usize].name
+    }
+
+    #[test]
+    fn a_project_filter_survives_a_new_project_that_sorts_earlier() {
+        let mut a = app_on(build(&[
+            ("b/1.jsonl", "-Users-me-beta", SONNET, 2),
+            ("c/1.jsonl", "-Users-me-gamma", SONNET, 3),
+        ]));
+        a.project_filter = a.ds.project_by_key("-Users-me-beta");
+        a.recompute();
+        assert_eq!(a.project_filter, Some(0));
+        assert_eq!(a.summary.total.msgs, 2);
+
+        // "a/" sorts before "b/", so every project id shifts up by one.
+        a.on_msg(Msg::Data(build(&[
+            ("a/1.jsonl", "-Users-me-alpha", SONNET, 4),
+            ("b/1.jsonl", "-Users-me-beta", SONNET, 2),
+            ("c/1.jsonl", "-Users-me-gamma", SONNET, 3),
+        ])));
+        assert_eq!(a.project_filter, Some(1), "id moved with the project");
+        assert_eq!(selected_project(&a), "beta");
+        assert_eq!(a.summary.total.msgs, 2, "only beta's messages are counted");
+    }
+
+    #[test]
+    fn a_model_filter_survives_a_new_model_in_an_earlier_file() {
+        let mut a = app_on(build(&[
+            ("b/1.jsonl", "-Users-me-p", OPUS, 2),
+            ("c/1.jsonl", "-Users-me-p", SONNET, 3),
+        ]));
+        a.model_filter = a.ds.model_by_name(OPUS);
+        a.recompute();
+        assert_eq!(a.model_filter, Some(0));
+        assert_eq!(a.summary.total.msgs, 2);
+
+        // A haiku file sorting first takes id 0; opus becomes 1.
+        a.on_msg(Msg::Data(build(&[
+            ("a/1.jsonl", "-Users-me-p", HAIKU, 4),
+            ("b/1.jsonl", "-Users-me-p", OPUS, 2),
+            ("c/1.jsonl", "-Users-me-p", SONNET, 3),
+        ])));
+        assert_eq!(a.model_filter, Some(1), "id moved with the model");
+        assert_eq!(selected_model(&a), OPUS);
+        assert_eq!(a.summary.total.msgs, 2, "only opus messages are counted");
+    }
+
+    #[test]
+    fn filters_whose_target_disappears_are_cleared() {
+        let mut a = app_on(build(&[
+            ("b/1.jsonl", "-Users-me-beta", OPUS, 2),
+            ("c/1.jsonl", "-Users-me-gamma", SONNET, 3),
+        ]));
+        a.project_filter = a.ds.project_by_key("-Users-me-beta");
+        a.model_filter = a.ds.model_by_name(OPUS);
+        a.recompute();
+        assert_eq!(a.summary.total.msgs, 2);
+
+        // Both beta and opus are gone; their old ids (0) now name other things.
+        a.on_msg(Msg::Data(build(&[
+            ("a/1.jsonl", "-Users-me-alpha", HAIKU, 4),
+            ("c/1.jsonl", "-Users-me-gamma", SONNET, 3),
+        ])));
+        assert_eq!((a.model_filter, a.project_filter), (None, None));
+        assert_eq!(a.summary.total.msgs, 7, "nothing is filtered any more");
+    }
+
+    #[test]
+    fn same_label_projects_are_told_apart_by_directory() {
+        let mut one = transcript("-Users-me-x-app", SONNET, 1, 2);
+        let mut two = transcript("-Users-me-y-app", SONNET, 2, 3);
+        one.label = Some("app".into());
+        two.label = Some("app".into());
+        let build_with = |files: &[(&str, &crate::scan::FileEntry)]| {
+            Arc::new(Dataset::build(
+                &files.iter().map(|(p, f)| ((*p).to_string(), (*f).clone())).collect(),
+            ))
+        };
+        let mut a = app_on(build_with(&[("1", &one), ("2", &two)]));
+        a.project_filter = a.ds.project_by_key("-Users-me-y-app");
+        a.recompute();
+        assert_eq!(a.summary.total.msgs, 3);
+        // The x project's file now sorts after y's, swapping the ids; the label is no help.
+        a.on_msg(Msg::Data(build_with(&[("0", &two), ("1", &one)])));
+        assert_eq!(a.project_filter, Some(0));
+        assert_eq!(a.summary.total.msgs, 3);
+    }
+
     #[test]
     fn m_walks_through_every_model_then_clears() {
         let mut a = loaded(Range::All);
         let all_msgs = a.summary.total.msgs;
-        let models: Vec<u16> = a.models_sorted.iter().map(|m| m.0).collect();
+        let models: Vec<u32> = a.models_sorted.iter().map(|m| m.0).collect();
         assert!(models.len() >= 3, "demo data uses several models");
-        let msgs_by_model: std::collections::HashMap<u16, u64> =
+        let msgs_by_model: std::collections::HashMap<u32, u64> =
             a.models_sorted.iter().map(|(m, agg)| (*m, agg.msgs)).collect();
 
         let mut visited = Vec::new();

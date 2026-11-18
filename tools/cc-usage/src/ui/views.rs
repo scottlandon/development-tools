@@ -439,7 +439,7 @@ fn bar_list(f: &mut Frame, area: Rect, name: &str, items: &[BarItem]) {
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-fn breakdown_items(app: &App, items: &[(u16, Agg)], projects: bool, limit: usize) -> Vec<BarItem> {
+fn breakdown_items(app: &App, items: &[(u32, Agg)], projects: bool, limit: usize) -> Vec<BarItem> {
     let metric = app.metric;
     let sum: f64 = items.iter().map(|(_, a)| value(metric, a)).sum();
     items
@@ -565,7 +565,7 @@ pub fn breakdown(f: &mut Frame, area: Rect, app: &mut App, tier: Tier) {
         _ => vec![name_w(6), spec(C::Cost)],
     };
     let metric = app.metric;
-    let items: &Vec<(u16, Agg)> = if projects {
+    let items: &Vec<(u32, Agg)> = if projects {
         &app.projects_sorted
     } else {
         &app.models_sorted
@@ -614,7 +614,7 @@ pub fn breakdown(f: &mut Frame, area: Rect, app: &mut App, tier: Tier) {
     } else {
         area
     };
-    let items: &Vec<(u16, Agg)> = if projects {
+    let items: &Vec<(u32, Agg)> = if projects {
         &app.projects_sorted
     } else {
         &app.models_sorted

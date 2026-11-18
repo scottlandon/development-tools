@@ -92,8 +92,8 @@ impl Builder {
             self.rows.push(Row {
                 ts: t,
                 day: self.days.day(t),
-                model: cast::to_u16(model),
-                project: cast::to_u16(project),
+                model: cast::to_u32(model),
+                project: cast::to_u32(project),
                 session,
                 i,
                 o,
@@ -115,6 +115,7 @@ pub fn dataset(now: i64) -> Dataset {
     let models: Vec<ModelInfo> = MODELS
         .iter()
         .map(|(n, _)| ModelInfo {
+            name: (*n).to_string(),
             short: short_model(n),
             price: pricing::lookup(n),
         })
@@ -162,6 +163,7 @@ pub fn dataset(now: i64) -> Dataset {
         rows,
         models,
         projects: PROJECTS.iter().map(|p| p.0.to_string()).collect(),
+        project_keys: PROJECTS.iter().map(|p| format!("-demo-{}", p.0)).collect(),
         sessions: session,
         files: session as usize,
     }

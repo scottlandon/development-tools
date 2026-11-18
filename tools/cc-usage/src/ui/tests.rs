@@ -24,6 +24,7 @@ fn dataset(days: i32) -> Dataset {
     let models: Vec<ModelInfo> = names
         .iter()
         .map(|n| ModelInfo {
+            name: (*n).to_string(),
             short: crate::data::short_model(n),
             price: pricing::lookup(n),
         })
@@ -32,7 +33,7 @@ fn dataset(days: i32) -> Dataset {
     for d in 0..days {
         let du = d.cast_unsigned();
         for k in 0..6u32 {
-            let model = ((du + k) % 4) as u16;
+            let model = (du + k) % 4;
             let (i, o, cr, cw5) = (
                 200 + k * 10,
                 1500 + du * 37 + k * 400,
@@ -46,7 +47,7 @@ fn dataset(days: i32) -> Dataset {
                 ts: i64::from(TODAY - d) * 86_400 + 40_000 + i64::from(k) * 600,
                 day: TODAY - d,
                 model,
-                project: (k % 3) as u16,
+                project: k % 3,
                 session: (du * 6 + k) % 17,
                 i,
                 o,
@@ -67,6 +68,7 @@ fn dataset(days: i32) -> Dataset {
             "development-tools".into(),
             "a-very-long-project-name-indeed".into(),
         ],
+        project_keys: vec!["-k0".into(), "-k1".into(), "-k2".into()],
         sessions: 17,
         files: 42,
     }

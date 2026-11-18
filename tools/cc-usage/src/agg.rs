@@ -110,7 +110,7 @@ pub struct LiveBucket {
     /// Epoch seconds at the start of the bucket.
     pub start: i64,
     pub agg: Agg,
-    pub models: Vec<(u16, Agg)>,
+    pub models: Vec<(u32, Agg)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -178,8 +178,8 @@ pub fn compute_live(ds: &Dataset, f: Filter, window: LiveWindow, now: i64) -> Li
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Filter {
     pub range_days: Option<i32>,
-    pub model: Option<u16>,
-    pub project: Option<u16>,
+    pub model: Option<u32>,
+    pub project: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -219,20 +219,20 @@ pub struct DayAgg {
     pub day: i32,
     pub agg: Agg,
     /// Per-model breakdown, sorted by model id.
-    pub models: Vec<(u16, Agg)>,
+    pub models: Vec<(u32, Agg)>,
 }
 
 #[derive(Clone, Debug)]
 pub struct SessionAgg {
     /// Interned session id; the last-resort tiebreak that keeps the session order stable.
     pub session: u32,
-    pub project: u16,
+    pub project: u32,
     pub first: i64,
     pub last: i64,
     pub agg: Agg,
     /// Model with the most cost/tokens in this session.
-    pub top_model: u16,
-    models: Vec<(u16, u64)>,
+    pub top_model: u32,
+    models: Vec<(u32, u64)>,
 }
 
 #[derive(Default, Debug)]
@@ -240,11 +240,11 @@ pub struct Summary {
     pub today: i32,
     pub days: Vec<DayAgg>,
     pub total: Agg,
-    pub by_model: Vec<(u16, Agg)>,
-    pub by_project: Vec<(u16, Agg)>,
+    pub by_model: Vec<(u32, Agg)>,
+    pub by_project: Vec<(u32, Agg)>,
     pub sessions: Vec<SessionAgg>,
     /// Models ordered by usage (for stable chart colours).
-    pub model_rank: Vec<u16>,
+    pub model_rank: Vec<u32>,
 }
 
 #[expect(
@@ -254,8 +254,8 @@ pub struct Summary {
 pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
     let start_day = f.range_days.map(|n| today - n + 1);
     let mut by_day: HashMap<i32, DayAgg> = HashMap::new();
-    let mut by_model: HashMap<u16, Agg> = HashMap::new();
-    let mut by_project: HashMap<u16, Agg> = HashMap::new();
+    let mut by_model: HashMap<u32, Agg> = HashMap::new();
+    let mut by_project: HashMap<u32, Agg> = HashMap::new();
     let mut sess: HashMap<u32, SessionAgg> = HashMap::new();
     let mut total = Agg::default();
 
@@ -332,7 +332,7 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
         }
     }
 
-    let sort_desc = |v: &mut Vec<(u16, Agg)>| {
+    let sort_desc = |v: &mut Vec<(u32, Agg)>| {
         v.sort_by(|a, b| {
             b.1.cost
                 .partial_cmp(&a.1.cost)
@@ -382,13 +382,13 @@ mod tests {
     use super::*;
     use crate::data::ModelInfo;
 
-    fn row(day: i32, model: u16, project: u16, o: u32, cost: f64) -> Row {
+    fn row(day: i32, model: u32, project: u32, o: u32, cost: f64) -> Row {
         Row {
             ts: i64::from(day) * 86_400,
             day,
             model,
             project,
-            session: u32::from(project),
+            session: project,
             i: 1,
             o,
             cr: 10,
@@ -419,15 +419,18 @@ mod tests {
             ],
             models: vec![
                 ModelInfo {
+                    name: "a".into(),
                     short: "a".into(),
                     price: None,
                 },
                 ModelInfo {
+                    name: "b".into(),
                     short: "b".into(),
                     price: None,
                 },
             ],
             projects: vec!["p0".into(), "p1".into()],
+            project_keys: vec!["-p0".into(), "-p1".into()],
             sessions: 2,
             files: 2,
         }
@@ -436,7 +439,7 @@ mod tests {
     #[test]
     fn live_window_buckets_rates_and_filters() {
         let now = 120_030; // 30 s into a minute-aligned bucket
-        let at = |age: i64, model: u16, o: u32| {
+        let at = |age: i64, model: u32, o: u32| {
             let mut r = row(0, model, 0, o, 1.0);
             r.ts = now - age;
             r
@@ -551,6 +554,7 @@ mod tests {
     fn models_ab() -> Vec<ModelInfo> {
         ["a", "b"]
             .map(|s| ModelInfo {
+                name: s.into(),
                 short: s.into(),
                 price: None,
             })
@@ -562,6 +566,7 @@ mod tests {
             rows,
             models: models_ab(),
             projects: vec!["p0".into(), "p1".into(), "p2".into()],
+            project_keys: vec!["-p0".into(), "-p1".into(), "-p2".into()],
             sessions: 3,
             files: 1,
         }
@@ -629,7 +634,7 @@ mod tests {
     #[test]
     fn ties_in_the_breakdowns_and_sessions_sort_by_id_every_time() {
         // Several models and projects with identical usage: only the ids tell them apart.
-        let rows: Vec<Row> = (0..8u16)
+        let rows: Vec<Row> = (0..8u32)
             .rev()
             .map(|id| {
                 let mut r = row(100, id, id, 5, 1.0);
@@ -638,7 +643,7 @@ mod tests {
             })
             .collect();
         let d = dataset_of(rows); // `compute` only looks at the rows, not the name tables
-        let want: Vec<u16> = (0..8).collect();
+        let want: Vec<u32> = (0..8).collect();
         let want_sessions: Vec<u32> = (0..8).collect();
         // Each call builds fresh HashMaps with a fresh random seed; the old code failed this within a few runs.
         for _ in 0..50 {
@@ -687,7 +692,7 @@ mod tests {
         }
         rows.push(with(100, 1, 2, 1_100, 0));
         let s = compute(&dataset_of(rows), Filter::default(), 100);
-        let top = |project: u16| s.sessions.iter().find(|x| x.project == project).unwrap().top_model;
+        let top = |project: u32| s.sessions.iter().find(|x| x.project == project).unwrap().top_model;
         assert_eq!(top(0), 0);
         assert_eq!(top(1), 1);
         assert_eq!(top(2), 0, "weights add up per model across a session's rows");
@@ -708,7 +713,7 @@ mod tests {
         assert_eq!(all_cached.cache_hit(), Some(1.0));
     }
 
-    fn live_row(ts: i64, model: u16, project: u16, o: u32) -> Row {
+    fn live_row(ts: i64, model: u32, project: u32, o: u32) -> Row {
         Row {
             ts,
             day: 0,

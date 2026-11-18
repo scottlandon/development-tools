@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, HashMap};
 pub struct Row {
     pub ts: i64,
     pub day: i32,
-    pub model: u16,
-    pub project: u16,
+    pub model: u32,
+    pub project: u32,
     pub session: u32,
     pub i: u32,
     pub o: u32,
@@ -26,6 +26,9 @@ pub struct Row {
 
 #[derive(Clone, Debug)]
 pub struct ModelInfo {
+    /// Full model id as it appears in the transcripts. Unlike the index into `Dataset::models`,
+    /// which depends on scan order, this is stable across rebuilds.
+    pub name: String,
     pub short: String,
     pub price: Option<Price>,
 }
@@ -34,7 +37,11 @@ pub struct ModelInfo {
 pub struct Dataset {
     pub rows: Vec<Row>,
     pub models: Vec<ModelInfo>,
+    /// Display labels; two projects can share one.
     pub projects: Vec<String>,
+    /// Encoded transcript directory name (`FileEntry::project`) of each project, parallel to
+    /// `projects`. Unique and stable across rebuilds, unlike the index or the label.
+    pub project_keys: Vec<String>,
     /// Number of distinct sessions (ids in `Row::session` run `0..sessions`).
     pub sessions: u32,
     pub files: usize,
@@ -50,6 +57,16 @@ pub fn short_model(name: &str) -> String {
 }
 
 impl Dataset {
+    /// Id of the model with this full id, if present.
+    pub fn model_by_name(&self, name: &str) -> Option<u32> {
+        self.models.iter().position(|m| m.name == name).map(cast::to_u32)
+    }
+
+    /// Id of the project with this encoded directory name, if present.
+    pub fn project_by_key(&self, key: &str) -> Option<u32> {
+        self.project_keys.iter().position(|k| k == key).map(cast::to_u32)
+    }
+
     /// Transcript files were found but none yielded a usage record. Either those sessions are
     /// brand new or Claude Code changed its log format; better to say so than to show zeros.
     pub fn looks_unparsed(&self) -> bool {
@@ -61,9 +78,9 @@ impl Dataset {
             files: files.len(),
             ..Default::default()
         };
-        let mut model_ix: HashMap<&str, u16> = HashMap::new();
-        let mut project_ix: HashMap<&str, u16> = HashMap::new();
-        let mut session_ix: HashMap<(u16, &str), u32> = HashMap::new();
+        let mut model_ix: HashMap<&str, u32> = HashMap::new();
+        let mut project_ix: HashMap<&str, u32> = HashMap::new();
+        let mut session_ix: HashMap<(u32, &str), u32> = HashMap::new();
         let mut seen: HashMap<u64, usize> = HashMap::new();
         let mut days = LocalDays::default();
 
@@ -72,22 +89,24 @@ impl Dataset {
                 let name = entry.label.clone();
                 ds.projects
                     .push(name.unwrap_or_else(|| entry.project.trim_start_matches('-').to_string()));
-                cast::wrapping_u16_id(ds.projects.len() - 1)
+                ds.project_keys.push(entry.project.clone());
+                cast::to_u32(ds.projects.len() - 1)
             });
             let si = *session_ix.entry((pi, entry.session.as_str())).or_insert_with(|| {
                 ds.sessions += 1;
                 ds.sessions - 1
             });
-            let remap: Vec<u16> = entry
+            let remap: Vec<u32> = entry
                 .models
                 .iter()
                 .map(|m| {
                     *model_ix.entry(m.as_str()).or_insert_with(|| {
                         ds.models.push(ModelInfo {
+                            name: m.clone(),
                             short: short_model(m),
                             price: pricing::lookup(m),
                         });
-                        cast::wrapping_u16_id(ds.models.len() - 1)
+                        cast::to_u32(ds.models.len() - 1)
                     })
                 })
                 .collect();
@@ -250,10 +269,16 @@ mod tests {
             ["app", "Users-me-lib"],
             "label if known, else the directory name minus its leading dash"
         );
+        assert_eq!(ds.project_keys, ["-Users-me-app", "-Users-me-lib"]);
         assert_eq!(
             ds.models.iter().map(|m| m.short.as_str()).collect::<Vec<_>>(),
             ["sonnet-5-5", "opus-5-5"]
         );
+        assert_eq!(ds.models[0].name, "claude-sonnet-5-5-20260101");
+        assert_eq!(ds.model_by_name("claude-opus-5-5"), Some(1));
+        assert_eq!(ds.model_by_name("nope"), None);
+        assert_eq!(ds.project_by_key("-Users-me-lib"), Some(1));
+        assert_eq!(ds.project_by_key("app"), None, "keys are directory names, not labels");
         assert_eq!(
             ds.sessions, 3,
             "s1 and s2 under app, s1 under lib; the same id in one project is one session"
@@ -293,5 +318,10 @@ mod tests {
         let mut files = BTreeMap::new();
         files.insert("a".into(), file("-p", "s", None, "m", vec![]));
         assert!(Dataset::build(&files).looks_unparsed());
+    }
+
+    #[test]
+    fn rows_stay_compact_with_32_bit_ids() {
+        assert!(std::mem::size_of::<Row>() <= 56);
     }
 }

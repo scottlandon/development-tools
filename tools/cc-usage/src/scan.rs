@@ -24,7 +24,7 @@ use crate::timeutil::parse_iso;
 pub struct Rec {
     pub key: u64,
     pub ts: i64,
-    pub model: u16,
+    pub model: u32,
     pub i: u32,
     pub o: u32,
     pub cr: u32,
@@ -151,7 +151,7 @@ pub fn parse_chunk(buf: &[u8], entry: &mut FileEntry) -> usize {
         if entry.label.is_none() {
             entry.label = l.cwd.as_deref().and_then(label);
         }
-        let midx = cast::wrapping_u16_id(if let Some(p) = entry.models.iter().position(|m| m == model.as_ref()) {
+        let midx = cast::to_u32(if let Some(p) = entry.models.iter().position(|m| m == model.as_ref()) {
             p
         } else {
             entry.models.push(model.to_string());
