@@ -13,6 +13,11 @@ targets = [
 # Known vulnerabilities and unmaintained crates fail the build.
 unmaintained = "workspace"
 yanked = "deny"
+ignore = [
+    # chrono is flagged unmaintained (no vulnerability). cc-usage only uses it for local-timezone
+    # offsets and time formatting in src/timeutil.rs; replacing it is tracked as follow-up work.
+    { id = "RUSTSEC-2026-0543", reason = "unmaintained, not vulnerable; replacement tracked as follow-up" },
+]
 
 [licenses]
 # Permissive licences only. Anything else has to be added here on purpose.
