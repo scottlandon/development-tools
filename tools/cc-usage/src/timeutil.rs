@@ -76,8 +76,15 @@ pub fn parse_iso(s: &str) -> Option<i64> {
     }
     if i + 5 < b.len() && (b[i] == b'+' || b[i] == b'-') {
         let sign = if b[i] == b'+' { 1 } else { -1 };
-        let oh = i64::from(b[i + 1] - b'0') * 10 + i64::from(b[i + 2] - b'0');
-        let om = i64::from(b[i + 4] - b'0') * 10 + i64::from(b[i + 5] - b'0');
+        let digits = [b[i + 1], b[i + 2], b[i + 4], b[i + 5]];
+        if b[i + 3] != b':' || !digits.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        let oh = i64::from(digits[0] - b'0') * 10 + i64::from(digits[1] - b'0');
+        let om = i64::from(digits[2] - b'0') * 10 + i64::from(digits[3] - b'0');
+        if oh > 23 || om > 59 {
+            return None;
+        }
         ts -= sign * (oh * 3600 + om * 60);
     }
     Some(ts)
@@ -171,6 +178,22 @@ mod tests {
         assert_eq!(parse_iso("1970-01-01T00:00:00-05:30"), Some(19_800));
         assert_eq!(parse_iso("garbage"), None);
         assert_eq!(parse_iso("2026-13-01T00:00:00Z"), None);
+    }
+
+    #[test]
+    fn iso_offset_is_validated() {
+        assert_eq!(parse_iso("2026-11-05T10:00:00+0x:00"), None);
+        assert_eq!(parse_iso("2026-11-05T10:00:00+01-00"), None);
+        assert_eq!(parse_iso("2026-11-05T10:00:00+25:00"), None);
+        assert_eq!(parse_iso("2026-11-05T10:00:00+01:60"), None);
+        assert_eq!(
+            parse_iso("2026-11-05T10:00:00 01:00"),
+            Some(parse_iso("2026-11-05T10:00:00Z").unwrap())
+        );
+        assert_eq!(
+            parse_iso("2026-11-05T10:00:00+23:59"),
+            Some(parse_iso("2026-11-05T10:00:00Z").unwrap() - (23 * 3600 + 59 * 60))
+        );
     }
 
     #[test]

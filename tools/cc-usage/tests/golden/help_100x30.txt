@@ -15,7 +15,7 @@
 ╭ Daily · 30 days ─│ m / p           cycle model / project filter               │──────────── 1/30 ╮
 │            Input │ Enter           filter by selected model/project           │                  │
 │Sat 11-08   1.35K │ Esc             clear filters                              │                  │
-│Fri 11-07   1.35K │ a / A           next / previous colour theme (remembered)  │                  │
+│Fri 11-07   1.35K │ a / A           next / previous colour theme               │                  │
 │Thu 11-06   1.35K │ s               sort sessions                              │                  │
 │Wed 11-05   1.35K │ r               rescan now                                 │                  │
 │Tue 11-04   1.35K │ q  Ctrl-C       quit                                       │                  │

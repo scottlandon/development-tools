@@ -55,8 +55,10 @@ impl Price {
 
 /// Order matters: most specific patterns first.
 const TABLE: &[(&str, Price)] = &[
+    ("fable-5-2", Price::new(8.0, 40.0, 0.20)),
     ("fable-5-1", Price::new(10.0, 50.0, 0.25)),
     ("fable", Price::new(10.0, 50.0, 1.0)),
+    ("mythos-5-2", Price::new(8.0, 40.0, 0.20)),
     ("mythos-5-1", Price::new(10.0, 50.0, 0.25)),
     ("mythos", Price::new(10.0, 50.0, 1.0)),
     ("opus-5-5", Price::new(4.0, 20.0, 0.20)),
@@ -92,6 +94,12 @@ mod tests {
         assert_eq!(lookup("claude-haiku-5-5").unwrap().input, 0.10);
         assert_eq!(lookup("claude-haiku-4-5-20251001").unwrap().input, 1.0);
         assert_eq!(lookup("claude-fable-5-1").unwrap().cache_read, 0.25);
+        for m in ["claude-fable-5-2", "claude-mythos-5-2"] {
+            let p = lookup(m).unwrap();
+            assert_eq!((p.input, p.output), (8.0, 40.0), "{m}");
+        }
+        assert_eq!(lookup("claude-fable-5").unwrap().input, 10.0);
+        assert_eq!(lookup("claude-mythos-5").unwrap().input, 10.0);
         assert!(lookup("gpt-9").is_none());
     }
 
@@ -102,6 +110,11 @@ mod tests {
         assert_eq!(lookup("claude-sonnet-5").unwrap().cache_read, 0.20);
         assert_eq!(lookup("claude-mythos-5-1").unwrap().cache_read, 0.25);
         assert_eq!(lookup("claude-mythos-5").unwrap().cache_read, 1.0);
+        for m in ["claude-fable-5-2", "claude-mythos-5-2"] {
+            let p = lookup(m).unwrap();
+            assert_eq!(p.cache_read, 0.20, "{m}");
+            assert_eq!((p.write_5m, p.write_1h), (10.0, 16.0), "{m}");
+        }
         let p = lookup("claude-sonnet-5-5").unwrap();
         assert_eq!((p.write_5m, p.write_1h), (2.5, 4.0));
     }

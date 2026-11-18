@@ -387,7 +387,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("m / p", "cycle model / project filter"),
         ("Enter", "filter by selected model/project"),
         ("Esc", "clear filters"),
-        ("a / A", "next / previous colour theme (remembered)"),
+        ("a / A", "next / previous colour theme"),
         ("s", "sort sessions"),
         ("r", "rescan now"),
         ("q  Ctrl-C", "quit"),

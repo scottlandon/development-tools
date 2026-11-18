@@ -200,7 +200,7 @@ impl Agg {
         self.i += u64::from(r.i);
         self.o += u64::from(r.o);
         self.cr += u64::from(r.cr);
-        self.cw += u64::from(r.cw5 + r.cw1);
+        self.cw += u64::from(r.cw5) + u64::from(r.cw1);
         self.cost += r.cost;
         self.unpriced += u64::from(!r.priced);
     }
@@ -385,6 +385,16 @@ mod tests {
             cost,
             priced: true,
         }
+    }
+
+    #[test]
+    fn cache_write_totals_do_not_overflow_u32() {
+        let mut a = Agg::default();
+        let mut r = row(0, 0, 0, 1, 0.0);
+        r.cw5 = u32::MAX;
+        r.cw1 = u32::MAX;
+        a.add(&r);
+        assert_eq!(a.cw, 2 * u64::from(u32::MAX));
     }
 
     fn ds() -> Dataset {

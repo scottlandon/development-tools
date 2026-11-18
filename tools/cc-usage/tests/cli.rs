@@ -274,6 +274,30 @@ fn bad_arguments_exit_2_with_a_useful_message() {
 }
 
 #[test]
+fn non_finite_refresh_is_rejected() {
+    for v in ["nan", "inf", "-inf", "NaN"] {
+        let out = run(&["--refresh", v, "--demo", "--print"], &[]);
+        assert_eq!(out.status.code(), Some(2), "{v}");
+        assert!(
+            stderr(&out).contains("--refresh needs a number"),
+            "{v}: {}",
+            stderr(&out)
+        );
+    }
+}
+
+#[test]
+fn huge_days_is_clamped() {
+    let started = std::time::Instant::now();
+    let out = run(&["--demo", "--print", "--days", "1000000000"], &[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(started.elapsed().as_secs() < 30, "took {:?}", started.elapsed());
+    let n = stdout(&out).lines().count();
+    assert!(n <= 3650 + 100, "{n} lines");
+    assert!(n > 100, "{n} lines");
+}
+
+#[test]
 fn help_and_version() {
     let out = run(&["--help"], &[]);
     assert!(out.status.success());

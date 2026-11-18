@@ -31,7 +31,7 @@ USAGE:
 OPTIONS:
     -r, --range <1d|7d|30d|90d|all>   Initial time range (default: 7d)
         --print                       Print a plain-text report and exit (no TUI)
-        --days <N>                    With --print: number of days (default: 14)
+        --days <N>                    With --print: number of days, 1-3650 (default: 14)
         --projects-dir <PATH>         Transcript directory (repeatable; default: ~/.claude/projects)
         --refresh <SECS>              Rescan interval (default: 3)
         --theme <NAME>                Colour theme: mainframe (default), amber, catppuccin
@@ -89,10 +89,18 @@ fn parse_args() -> Result<Args, String> {
                 }
             }
             "--print" => a.print = true,
-            "--days" => a.days = val("--days")?.parse().map_err(|_| "--days needs a number")?,
+            "--days" => {
+                a.days = val("--days")?
+                    .parse::<i32>()
+                    .map_err(|_| "--days needs a number")?
+                    .clamp(1, 3650);
+            }
             "--projects-dir" => a.dirs.push(PathBuf::from(val("--projects-dir")?)),
             "--refresh" => {
                 let secs: f64 = val("--refresh")?.parse().map_err(|_| "--refresh needs a number")?;
+                if !secs.is_finite() {
+                    return Err("--refresh needs a number".into());
+                }
                 a.refresh = secs.clamp(0.5, 3600.0);
             }
             "--theme" => {
