@@ -1,0 +1,45 @@
+name: Price check
+
+# cc-usage ships a built-in price table. Prices drift, so this opens an issue when the table
+# hasn't been re-checked against Anthropic's published pricing for a while.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MAX_AGE_DAYS: 60
+
+jobs:
+  price-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Open an issue if the price table is stale
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          verified=$(sed -n 's/^pub const PRICES_VERIFIED: &str = "\(.*\)";/\1/p' tools/cc-usage/src/pricing.rs)
+          [ -n "$verified" ] || { echo "PRICES_VERIFIED not found"; exit 1; }
+          age=$(( ( $(date -u +%s) - $(date -u -d "$verified" +%s) ) / 86400 ))
+          echo "Prices last verified $verified ($age days ago)"
+          [ "$age" -gt "$MAX_AGE_DAYS" ] || exit 0
+          if [ -n "$(gh issue list --state open --label prices --json number --jq '.[].number')" ]; then
+            echo "An open price issue already exists"; exit 0
+          fi
+          gh label create prices --description "cc-usage price table" --color BFD4F2 2>/dev/null || true
+          gh issue create --label prices --title "cc-usage price table is $age days old" --body "\
+          The built-in prices in \`tools/cc-usage/src/pricing.rs\` were last checked against
+          https://platform.claude.com/docs/en/about-claude/pricing on **$verified**.
+
+          Re-check them (cache-read rates and any long-prompt tiers too), update the table, and bump
+          \`PRICES_VERIFIED\` in the same commit. See CONTRIBUTING.md."

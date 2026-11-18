@@ -1,0 +1,5 @@
+# Contributors get the same formatter and linter CI uses. The code itself builds on Rust 1.88+
+# (see `rust-version` in Cargo.toml); this file only picks what rustup installs for development.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

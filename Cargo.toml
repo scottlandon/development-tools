@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["tools/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.88"
+publish = false
+version = "0.1.0"
+license = "MIT"
+repository = "https://github.com/scottlandon/development-tools"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

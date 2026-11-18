@@ -1,0 +1,29 @@
+name: Bug report
+description: Something is wrong or crashes
+labels: [bug]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool and version
+      description: For example `cc-usage --version`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS, terminal and pane size
+      placeholder: macOS 15, Ghostty, 100x30
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: If you can reproduce it with `cc-usage --demo`, say so. Please don't paste real transcripts or usage figures.
