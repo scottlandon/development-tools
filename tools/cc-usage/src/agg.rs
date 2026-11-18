@@ -224,6 +224,8 @@ pub struct DayAgg {
 
 #[derive(Clone, Debug)]
 pub struct SessionAgg {
+    /// Interned session id; the last-resort tiebreak that keeps the session order stable.
+    pub session: u32,
     pub project: u16,
     pub first: i64,
     pub last: i64,
@@ -288,6 +290,7 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
             d.models.push((r.model, a));
         }
         let s = sess.entry(r.session).or_insert_with(|| SessionAgg {
+            session: r.session,
             project: r.project,
             first: r.ts,
             last: r.ts,
@@ -335,6 +338,8 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
                 .partial_cmp(&a.1.cost)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(b.1.total().cmp(&a.1.total()))
+                // HashMap order is random, so break full ties by id to keep ranks and colours stable.
+                .then(a.0.cmp(&b.0))
         });
     };
     let mut by_model: Vec<_> = by_model.into_iter().collect();
@@ -351,7 +356,14 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
             s
         })
         .collect();
-    sessions.sort_by_key(|s| std::cmp::Reverse(s.last));
+    // Newest first; ties fall back to fields that never depend on HashMap iteration order.
+    sessions.sort_by(|a, b| {
+        b.last
+            .cmp(&a.last)
+            .then(a.first.cmp(&b.first))
+            .then(a.project.cmp(&b.project))
+            .then(a.session.cmp(&b.session))
+    });
 
     let model_rank = by_model.iter().map(|(m, _)| *m).collect();
     Summary {
@@ -612,6 +624,30 @@ mod tests {
             3,
             "model filter applies to projects (m0 has three rows)"
         );
+    }
+
+    #[test]
+    fn ties_in_the_breakdowns_and_sessions_sort_by_id_every_time() {
+        // Several models and projects with identical usage: only the ids tell them apart.
+        let rows: Vec<Row> = (0..8u16)
+            .rev()
+            .map(|id| {
+                let mut r = row(100, id, id, 5, 1.0);
+                r.ts = 100 * 86_400; // identical timestamps, so sessions tie as well
+                r
+            })
+            .collect();
+        let d = dataset_of(rows); // `compute` only looks at the rows, not the name tables
+        let want: Vec<u16> = (0..8).collect();
+        let want_sessions: Vec<u32> = (0..8).collect();
+        // Each call builds fresh HashMaps with a fresh random seed; the old code failed this within a few runs.
+        for _ in 0..50 {
+            let s = compute(&d, Filter::default(), 100);
+            assert_eq!(s.by_model.iter().map(|(m, _)| *m).collect::<Vec<_>>(), want);
+            assert_eq!(s.by_project.iter().map(|(p, _)| *p).collect::<Vec<_>>(), want);
+            assert_eq!(s.model_rank, want);
+            assert_eq!(s.sessions.iter().map(|x| x.session).collect::<Vec<_>>(), want_sessions);
+        }
     }
 
     #[test]

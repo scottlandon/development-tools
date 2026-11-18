@@ -5,7 +5,7 @@ use crate::data::Dataset;
 use crate::scan::Scanner;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::time::Duration;
 
 pub enum Msg {
@@ -52,6 +52,15 @@ fn run(roots: Vec<PathBuf>, refresh: Duration, tx: Sender<Msg>, rx: Receiver<()>
         match rx.recv_timeout(refresh) {
             Err(RecvTimeoutError::Disconnected) => return,
             Ok(()) | Err(RecvTimeoutError::Timeout) => {}
+        }
+        // The UI asks for a rescan every second; if a scan outlasts that, requests queue up.
+        // Coalesce whatever is pending into the one scan we are about to do.
+        loop {
+            match rx.try_recv() {
+                Ok(()) => {}
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => return,
+            }
         }
     }
 }
@@ -131,6 +140,34 @@ mod tests {
         let (tags, data) = one_cycle(&w);
         assert_eq!(tags, ["scanning", "idle"], "no change, so no Data");
         assert!(data.is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_burst_of_rescan_requests_causes_one_scan_not_one_per_request() {
+        let (dir, _file) = setup("burst");
+        // Many files, so a scan is not instantaneous. A long interval, so only `rescan()` triggers scans.
+        for i in 0..100 {
+            std::fs::write(dir.join(format!("-proj/extra-{i}.jsonl")), line(&format!("x{i}"), 1)).unwrap();
+        }
+        let w = Worker::spawn(vec![dir.clone()], Duration::from_secs(3600));
+        one_cycle(&w);
+
+        for _ in 0..20 {
+            w.rescan();
+        }
+        // The burst must yield at least one more cycle (generous timeout)...
+        one_cycle(&w);
+        // ...then count any further ones until the worker has been quiet for a while.
+        let mut extra = 0;
+        while let Ok(msg) = w.rx.recv_timeout(Duration::from_millis(500)) {
+            extra += usize::from(matches!(msg, Msg::Scanning(true)));
+        }
+        assert!(
+            extra <= 2,
+            "20 queued requests caused {} scans, expected about one",
+            extra + 1
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

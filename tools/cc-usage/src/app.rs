@@ -162,6 +162,8 @@ impl App {
                 key(&b.1, metric)
                     .partial_cmp(&key(&a.1, metric))
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(b.1.total().cmp(&a.1.total()))
+                    .then(a.0.cmp(&b.0))
             });
             v
         };
@@ -194,14 +196,16 @@ impl App {
         let s: &[SessionAgg] = &self.summary.sessions;
         let mut ord: Vec<usize> = (0..s.len()).collect();
         match self.sess_sort {
-            SessSort::Recent => {} // already newest-first
+            SessSort::Recent => {} // already newest-first, with a total tiebreak
+            // Ties keep the Recent order (the index), which `compute` made deterministic.
             SessSort::Cost => ord.sort_by(|&a, &b| {
                 s[b].agg
                     .cost
                     .partial_cmp(&s[a].agg.cost)
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.cmp(&b))
             }),
-            SessSort::Tokens => ord.sort_by(|&a, &b| s[b].agg.total().cmp(&s[a].agg.total())),
+            SessSort::Tokens => ord.sort_by(|&a, &b| s[b].agg.total().cmp(&s[a].agg.total()).then(a.cmp(&b))),
         }
         self.sess_order = ord;
     }
