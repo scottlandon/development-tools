@@ -12,6 +12,7 @@ pub mod theme;
 mod views;
 
 use crate::app::{App, Metric, View};
+use crate::cast;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -86,7 +87,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 }
 
 fn message(f: &mut Frame, area: Rect, text: &str, color: Color) {
-    let lines = text.lines().count() as u16;
+    let lines = cast::to_u16(text.lines().count());
     let y = area.y + area.height.saturating_sub(lines) / 2;
     let r = Rect::new(area.x, y, area.width, lines.min(area.height));
     f.render_widget(
@@ -120,10 +121,10 @@ fn full(f: &mut Frame, area: Rect, app: &mut App) {
     } else {
         Stats::None
     };
-    let footer_h = (h >= 10) as u16;
+    let footer_h = u16::from(h >= 10);
 
     let (header, rest) = split_top(area, 1);
-    let (tabs, rest) = split_top(rest, show_tabs as u16);
+    let (tabs, rest) = split_top(rest, u16::from(show_tabs));
     let (stats_r, rest) = split_top(
         rest,
         match stats {
@@ -262,7 +263,7 @@ fn stat_values(app: &App) -> [(&'static str, String, String); 4] {
     } else {
         format!("{}/day", fmt::usd(t.cost / days))
     };
-    let hit = t.cache_hit().map(fmt::pct).unwrap_or_else(|| "–".into());
+    let hit = t.cache_hit().map_or_else(|| "–".into(), fmt::pct);
     [
         (
             "Tokens",
@@ -365,7 +366,7 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
         .find(|s| width(s) <= area.width as usize)
         .unwrap_or(&sets[3]);
     let mut spans = vec![Span::raw(" ")];
-    for (k, d) in chosen.iter() {
+    for (k, d) in *chosen {
         spans.push(Span::styled(
             *k,
             Style::default().fg(pal().accent).add_modifier(Modifier::BOLD),
@@ -391,7 +392,7 @@ fn help(f: &mut Frame, area: Rect) {
         ("r", "rescan now"),
         ("q  Ctrl-C", "quit"),
     ];
-    let h = (rows.len() as u16 + 4).min(area.height);
+    let h = (cast::to_u16(rows.len()) + 4).min(area.height);
     let w = 62u16.min(area.width);
     let r = Rect::new(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h);
     f.render_widget(Clear, r);

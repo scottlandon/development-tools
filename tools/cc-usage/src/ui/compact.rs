@@ -4,6 +4,7 @@
 use super::theme::{pal, series};
 use super::{chart, fmt, views};
 use crate::app::{App, Metric, View};
+use crate::cast;
 use crate::timeutil::fmt_md;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -47,7 +48,13 @@ fn render_live(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(Paragraph::new(head_line), top);
     if rest.height >= 3 && rest.width >= 8 {
         let buckets = views::live_buckets(app, &|a| a.total());
-        chart::render(f.buffer_mut(), rest, &buckets, &|v| fmt::tok(v as u64), &pal().series);
+        chart::render(
+            f.buffer_mut(),
+            rest,
+            &buckets,
+            &|v| fmt::tok(cast::f64_to_u64(v)),
+            &pal().series,
+        );
     } else if rest.height >= 1 {
         let vals: Vec<u64> = lv.buckets.iter().map(|b| b.agg.total()).collect();
         let keep = w.saturating_sub(2).min(vals.len());
@@ -59,7 +66,7 @@ fn render_live(f: &mut Frame, area: Rect, app: &App) {
                 if v == 0 {
                     ' '
                 } else {
-                    LEVELS[((v * 7 / max) as usize).min(7)]
+                    LEVELS[usize::try_from(v * 7 / max).map_or(7, |ix| ix.min(7))]
                 }
             })
             .collect();

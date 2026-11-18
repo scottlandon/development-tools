@@ -73,7 +73,9 @@ cargo build --release                           # optimised binaries in target/r
 
 To add a tool: `cargo new tools/<name>`. The workspace picks up `tools/*` automatically, and the new
 crate can inherit the shared `edition`, `version`, `rust-version` and `license` with
-`edition.workspace = true` etc.
+`edition.workspace = true` etc. Lints are configured once in `[workspace.lints]` in the root `Cargo.toml`
+(clippy pedantic plus a few restriction lints, `unsafe` forbidden); a new tool's `Cargo.toml` must opt in
+with `[lints]` and `workspace = true`.
 
 ## Contributing
 

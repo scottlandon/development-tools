@@ -4,6 +4,7 @@
 
 use super::fmt;
 use super::theme::pal;
+use crate::cast;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -98,13 +99,13 @@ pub fn render(buf: &mut Buffer, area: Rect, buckets: &[Bucket], axis: &dyn Fn(f6
     let ymax = buckets.iter().map(Bucket::total).fold(0.0, f64::max);
     if buckets.is_empty() || ymax <= 0.0 {
         let msg = "no usage in this range";
-        let x = area.x + area.width.saturating_sub(msg.len() as u16) / 2;
+        let x = area.x + area.width.saturating_sub(cast::to_u16(msg.len())) / 2;
         buf.set_string(x, area.y + area.height / 2, msg, Style::default().fg(pal().dim));
         return;
     }
 
     let want_labels = area.height >= 4;
-    let bars_h = (area.height as usize) - want_labels as usize;
+    let bars_h = (area.height as usize) - usize::from(want_labels);
     let top = axis(ymax);
     let mid = axis(ymax / 2.0);
     let axis_w = (top.chars().count().max(mid.chars().count()).max(1) + 1).min(9);
@@ -120,8 +121,8 @@ pub fn render(buf: &mut Buffer, area: Rect, buckets: &[Bucket], axis: &dyn Fn(f6
     let axis_style = Style::default().fg(pal().dim);
     let put_axis = |buf: &mut Buffer, row: usize, text: &str| {
         let t = fmt::trunc(text, axis_w - 1);
-        let x = area.x + (axis_w - 1 - t.chars().count()) as u16;
-        buf.set_string(x, area.y + row as u16, &t, axis_style);
+        let x = area.x + cast::to_u16(axis_w - 1 - t.chars().count());
+        buf.set_string(x, area.y + cast::to_u16(row), &t, axis_style);
     };
     put_axis(buf, 0, &top);
     if bars_h >= 6 {
@@ -132,20 +133,20 @@ pub fn render(buf: &mut Buffer, area: Rect, buckets: &[Bucket], axis: &dyn Fn(f6
     let total_units = (bars_h * 8) as f64;
     for (bi, b) in bins.iter().enumerate() {
         let (sx, bar_w) = g.slots[bi];
-        let x0 = area.x + (axis_w + sx) as u16;
+        let x0 = area.x + cast::to_u16(axis_w + sx);
         let total = b.total();
         if total <= 0.0 {
             // A faint baseline tick so empty days are visible as "nothing".
-            buf.set_string(x0, area.y + (bars_h - 1) as u16, "·", axis_style);
+            buf.set_string(x0, area.y + cast::to_u16(bars_h - 1), "·", axis_style);
             continue;
         }
-        let units = ((total / ymax * total_units).round() as usize).clamp(1, bars_h * 8);
+        let units = cast::f64_to_usize((total / ymax * total_units).round()).clamp(1, bars_h * 8);
         // Cumulative segment boundaries in eighth-cell units.
         let mut bounds = Vec::with_capacity(b.segs.len());
         let mut cum = 0.0;
         for &(c, v) in &b.segs {
             cum += v;
-            bounds.push(((cum / total * units as f64).round() as usize, c));
+            bounds.push((cast::f64_to_usize((cum / total * units as f64).round()), c));
         }
         for row in 0..bars_h {
             let filled = units.saturating_sub(row * 8).min(8);
@@ -157,25 +158,24 @@ pub fn render(buf: &mut Buffer, area: Rect, buckets: &[Bucket], axis: &dyn Fn(f6
                 .iter()
                 .find(|(bound, _)| *bound > top_unit)
                 .or(bounds.last())
-                .map(|x| x.1)
-                .unwrap_or(0);
+                .map_or(0, |x| x.1);
             let style = Style::default().fg(palette[colour_ix % palette.len()]);
             let ch = LOWER[filled - 1];
-            let y = area.y + (bars_h - 1 - row) as u16;
+            let y = area.y + cast::to_u16(bars_h - 1 - row);
             for dx in 0..bar_w {
-                buf[(x0 + dx as u16, y)].set_char(ch).set_style(style);
+                buf[(x0 + cast::to_u16(dx), y)].set_char(ch).set_style(style);
             }
         }
     }
 
     if want_labels {
-        let y = area.y + bars_h as u16;
+        let y = area.y + cast::to_u16(bars_h);
         let step = 6usize.div_ceil(g.min_slot).max(1);
         let last_x = area.x + area.width;
         for (bi, b) in bins.iter().enumerate().step_by(step) {
-            let x0 = area.x + (axis_w + g.slots[bi].0) as u16;
+            let x0 = area.x + cast::to_u16(axis_w + g.slots[bi].0);
             let label = &b.label;
-            if x0 + label.len() as u16 > last_x {
+            if x0 + cast::to_u16(label.len()) > last_x {
                 break;
             }
             buf.set_string(
@@ -226,7 +226,7 @@ mod tests {
         let src: Vec<_> = (0..10).map(|i| b(i, 1.0)).collect();
         let out = rebin(&src, 4);
         assert_eq!(out.len(), 4); // chunks of 3,3,3,1
-        let sum: f64 = out.iter().map(|x| x.total()).sum();
+        let sum: f64 = out.iter().map(super::Bucket::total).sum();
         assert!((sum - 10.0).abs() < 1e-9);
         assert_eq!(out[1].label, crate::timeutil::fmt_md(3));
     }
@@ -237,13 +237,13 @@ mod tests {
         let mut buf = Buffer::empty(area);
         let data = vec![b(20_000, 10.0), b(20_001, 5.0)];
         render(&mut buf, area, &data, &|v| format!("{v:.0}"), &[Color::Cyan]);
-        let axis_w = 3; // "10" + 1
+        let axis_w: u16 = 3; // "10" + 1
         // Tallest bar: every plot row (7 of them) is a full block.
         for y in 0..7 {
-            assert_eq!(buf[(axis_w as u16, y)].symbol(), "█", "row {y}");
+            assert_eq!(buf[(axis_w, y)].symbol(), "█", "row {y}");
         }
         // The half-height bar (second slot, 10 cells in) leaves the top row empty.
-        let second = axis_w as u16 + 10;
+        let second = axis_w + 10;
         assert_eq!(buf[(second, 0)].symbol(), " ");
         assert_eq!(buf[(second, 6)].symbol(), "█");
         assert_eq!(buf[(0, 0)].symbol(), "1"); // axis label "10"
@@ -254,7 +254,7 @@ mod tests {
         for (w, h) in [(0, 0), (1, 1), (7, 3), (8, 2), (9, 3), (20, 4)] {
             let area = Rect::new(0, 0, w, h);
             let mut buf = Buffer::empty(area);
-            let data: Vec<_> = (0..50).map(|i| b(20_000 + i, i as f64)).collect();
+            let data: Vec<_> = (0..50).map(|i| b(20_000 + i, f64::from(i))).collect();
             render(
                 &mut buf,
                 area,

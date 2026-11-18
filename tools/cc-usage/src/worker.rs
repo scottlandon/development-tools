@@ -34,6 +34,10 @@ impl Worker {
 
 /// Scan, publish a snapshot if anything changed, then wait for the next tick or a rescan request.
 /// Ends when the UI side hangs up (the process is exiting).
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the channel ends are owned by, and moved into, the worker thread"
+)]
 fn run(roots: Vec<PathBuf>, refresh: Duration, tx: Sender<Msg>, rx: Receiver<()>) {
     let mut sc = Scanner::new(roots);
     let mut first = true;

@@ -1,6 +1,7 @@
 //! Aggregations over the row table for a given filter. One pass produces
 //! everything the views need, so switching tabs never rescans.
 
+use crate::cast;
 use crate::data::{Dataset, Row};
 use std::collections::HashMap;
 
@@ -74,7 +75,7 @@ impl LiveWindow {
         }
     }
     pub fn step(self) -> i64 {
-        self.secs() / LIVE_BUCKETS as i64
+        self.secs() / cast::to_i64(LIVE_BUCKETS)
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -130,11 +131,11 @@ pub struct Live {
 pub fn compute_live(ds: &Dataset, f: Filter, window: LiveWindow, now: i64) -> Live {
     let step = window.step();
     let end = (now.div_euclid(step) + 1) * step;
-    let start = end - step * LIVE_BUCKETS as i64;
+    let start = end - step * cast::to_i64(LIVE_BUCKETS);
     let mut live = Live {
         window,
         step,
-        buckets: (0..LIVE_BUCKETS as i64)
+        buckets: (0..cast::to_i64(LIVE_BUCKETS))
             .map(|i| LiveBucket {
                 start: start + i * step,
                 ..Default::default()
@@ -149,16 +150,17 @@ pub fn compute_live(ds: &Dataset, f: Filter, window: LiveWindow, now: i64) -> Li
             continue;
         }
         // Rows stamped slightly in the future (clock skew) land in the last bar.
-        let idx = (((r.ts - start) / step) as usize).min(LIVE_BUCKETS - 1);
+        let idx = usize::try_from((r.ts - start) / step)
+            .unwrap_or(LIVE_BUCKETS - 1)
+            .min(LIVE_BUCKETS - 1);
         let b = &mut live.buckets[idx];
         b.agg.add(r);
-        match b.models.iter_mut().find(|(m, _)| *m == r.model) {
-            Some((_, a)) => a.add(r),
-            None => {
-                let mut a = Agg::default();
-                a.add(r);
-                b.models.push((r.model, a));
-            }
+        if let Some((_, a)) = b.models.iter_mut().find(|(m, _)| *m == r.model) {
+            a.add(r);
+        } else {
+            let mut a = Agg::default();
+            a.add(r);
+            b.models.push((r.model, a));
         }
         live.total.add(r);
         if r.ts >= now - 300 {
@@ -195,12 +197,12 @@ pub struct Agg {
 impl Agg {
     pub fn add(&mut self, r: &Row) {
         self.msgs += 1;
-        self.i += r.i as u64;
-        self.o += r.o as u64;
-        self.cr += r.cr as u64;
-        self.cw += (r.cw5 + r.cw1) as u64;
+        self.i += u64::from(r.i);
+        self.o += u64::from(r.o);
+        self.cr += u64::from(r.cr);
+        self.cw += u64::from(r.cw5 + r.cw1);
         self.cost += r.cost;
-        self.unpriced += (!r.priced) as u64;
+        self.unpriced += u64::from(!r.priced);
     }
     pub fn total(&self) -> u64 {
         self.i + self.o + self.cr + self.cw
@@ -243,6 +245,10 @@ pub struct Summary {
     pub model_rank: Vec<u16>,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "single pass over the rows that builds every summary table"
+)]
 pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
     let start_day = f.range_days.map(|n| today - n + 1);
     let mut by_day: HashMap<i32, DayAgg> = HashMap::new();
@@ -274,13 +280,12 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
             models: Vec::new(),
         });
         d.agg.add(r);
-        match d.models.iter_mut().find(|(m, _)| *m == r.model) {
-            Some((_, a)) => a.add(r),
-            None => {
-                let mut a = Agg::default();
-                a.add(r);
-                d.models.push((r.model, a));
-            }
+        if let Some((_, a)) = d.models.iter_mut().find(|(m, _)| *m == r.model) {
+            a.add(r);
+        } else {
+            let mut a = Agg::default();
+            a.add(r);
+            d.models.push((r.model, a));
         }
         let s = sess.entry(r.session).or_insert_with(|| SessionAgg {
             project: r.project,
@@ -293,7 +298,7 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
         s.first = s.first.min(r.ts);
         s.last = s.last.max(r.ts);
         s.agg.add(r);
-        let w = r.i as u64 + r.o as u64 + r.cw5 as u64 + r.cw1 as u64 + r.cr as u64 / 10;
+        let w = u64::from(r.i) + u64::from(r.o) + u64::from(r.cw5) + u64::from(r.cw1) + u64::from(r.cr) / 10;
         match s.models.iter_mut().find(|(m, _)| *m == r.model) {
             Some((_, t)) => *t += w,
             None => s.models.push((r.model, w)),
@@ -330,7 +335,7 @@ pub fn compute(ds: &Dataset, f: Filter, today: i32) -> Summary {
                 .partial_cmp(&a.1.cost)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(b.1.total().cmp(&a.1.total()))
-        })
+        });
     };
     let mut by_model: Vec<_> = by_model.into_iter().collect();
     let mut by_project: Vec<_> = by_project.into_iter().collect();
@@ -367,11 +372,11 @@ mod tests {
 
     fn row(day: i32, model: u16, project: u16, o: u32, cost: f64) -> Row {
         Row {
-            ts: day as i64 * 86_400,
+            ts: i64::from(day) * 86_400,
             day,
             model,
             project,
-            session: project as u32,
+            session: u32::from(project),
             i: 1,
             o,
             cr: 10,
@@ -446,7 +451,7 @@ mod tests {
         assert_eq!(LiveWindow::H24.next(), LiveWindow::M15);
         assert_eq!(LiveWindow::M15.prev(), LiveWindow::H24);
         for w in LiveWindow::ALL {
-            assert_eq!(w.step() * LIVE_BUCKETS as i64, w.secs());
+            assert_eq!(w.step() * cast::to_i64(LIVE_BUCKETS), w.secs());
         }
     }
 
@@ -512,7 +517,7 @@ mod tests {
         let shorts: std::collections::HashSet<_> = LiveWindow::ALL.iter().map(|w| w.short()).collect();
         assert_eq!((labels.len(), shorts.len()), (4, 4), "every window has its own name");
         for w in LiveWindow::ALL {
-            assert_eq!(w.step() * LIVE_BUCKETS as i64, w.secs(), "{w:?}: 60 equal bars");
+            assert_eq!(w.step() * cast::to_i64(LIVE_BUCKETS), w.secs(), "{w:?}: 60 equal bars");
             assert_eq!(w.next().prev(), w);
             assert_eq!(w.prev().next(), w);
         }
@@ -708,7 +713,7 @@ mod tests {
         assert_eq!(l.buckets[0].models.len(), 2, "split by model inside the bar");
         assert_eq!(l.buckets[1].agg.msgs, 1);
         assert_eq!(l.buckets[59].agg.msgs, 1, "the future row");
-        let idx_301 = ((NOW - 301 - START) / 60) as usize;
+        let idx_301 = usize::try_from((NOW - 301 - START) / 60).unwrap();
         assert_eq!(
             l.buckets[idx_301].agg.o,
             5 + 6 + 7,

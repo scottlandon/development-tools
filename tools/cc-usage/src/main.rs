@@ -1,5 +1,6 @@
 mod agg;
 mod app;
+mod cast;
 mod data;
 mod demo;
 mod pricing;
@@ -61,7 +62,7 @@ fn parse_args() -> Result<Args, String> {
         days: 14,
         dirs: vec![],
         refresh: 3.0,
-        theme: Default::default(),
+        theme: ui::theme::ThemeId::default(),
         truecolor: None,
         demo: false,
     };

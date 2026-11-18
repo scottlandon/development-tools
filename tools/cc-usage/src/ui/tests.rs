@@ -5,6 +5,7 @@
 use super::*;
 use crate::agg::Range;
 use crate::app::{App, View};
+use crate::cast;
 use crate::data::{Dataset, ModelInfo, Row};
 use crate::pricing;
 use ratatui::Terminal;
@@ -29,24 +30,24 @@ fn dataset(days: i32) -> Dataset {
         .collect();
     let mut rows = Vec::new();
     for d in 0..days {
+        let du = d.cast_unsigned();
         for k in 0..6u32 {
-            let model = ((d as u32 + k) % 4) as u16;
+            let model = ((du + k) % 4) as u16;
             let (i, o, cr, cw5) = (
                 200 + k * 10,
-                1500 + d as u32 * 37 + k * 400,
+                1500 + du * 37 + k * 400,
                 400_000 + k * 90_000,
                 20_000 + k * 1000,
             );
-            let cost = models[model as usize]
-                .price
-                .map(|p| p.cost(i as u64, o as u64, cr as u64, cw5 as u64, 0))
-                .unwrap_or(0.0);
+            let cost = models[model as usize].price.map_or(0.0, |p| {
+                p.cost(u64::from(i), u64::from(o), u64::from(cr), u64::from(cw5), 0)
+            });
             rows.push(Row {
-                ts: (TODAY - d) as i64 * 86_400 + 40_000 + k as i64 * 600,
+                ts: i64::from(TODAY - d) * 86_400 + 40_000 + i64::from(k) * 600,
                 day: TODAY - d,
                 model,
                 project: (k % 3) as u16,
-                session: (d as u32 * 6 + k) % 17,
+                session: (du * 6 + k) % 17,
                 i,
                 o,
                 cr,
@@ -255,7 +256,7 @@ fn live_app() -> App {
     let mut ds = dataset(2);
     let n = ds.rows.len();
     for (i, r) in ds.rows.iter_mut().enumerate() {
-        r.ts = now - (n - i) as i64 * 20;
+        r.ts = now - cast::to_i64(n - i) * 20;
     }
     a.ds = Arc::new(ds);
     a.view = View::Live;
@@ -493,7 +494,11 @@ fn golden(name: &str, frame: &str) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/golden")
         .join(format!("{name}.txt"));
-    let trimmed: String = frame.lines().map(|l| format!("{}\n", l.trim_end())).collect();
+    let trimmed: String = frame.lines().fold(String::new(), |mut acc, l| {
+        acc.push_str(l.trim_end());
+        acc.push('\n');
+        acc
+    });
     if std::env::var_os("UPDATE_GOLDEN").is_some() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, &trimmed).unwrap();
@@ -584,7 +589,7 @@ fn stat_strip_never_shows_a_half_cut_item() {
 fn zero_sized_panes_draw_nothing_and_do_not_panic() {
     let mut app = app_with(10, Range::Week);
     for (w, h) in [(0, 0), (0, 10), (10, 0)] {
-        assert!(render(&mut app, w, h).trim().is_empty());
+        assert_eq!(render(&mut app, w, h).trim(), "");
     }
 }
 

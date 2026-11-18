@@ -21,7 +21,13 @@ pub enum View {
 impl View {
     pub const ALL: [View; 5] = [View::Daily, View::Models, View::Projects, View::Sessions, View::Live];
     pub fn idx(self) -> usize {
-        View::ALL.iter().position(|v| *v == self).unwrap()
+        match self {
+            View::Daily => 0,
+            View::Models => 1,
+            View::Projects => 2,
+            View::Sessions => 3,
+            View::Live => 4,
+        }
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -66,6 +72,10 @@ impl SessSort {
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent UI state flags; a state enum would not simplify them"
+)]
 pub struct App {
     pub ds: Arc<Dataset>,
     pub have_data: bool,
@@ -266,8 +276,8 @@ impl App {
             return;
         }
         let t = &mut self.tables[self.view.idx()];
-        let cur = t.selected().unwrap_or(0) as isize;
-        t.select(Some((cur + delta).clamp(0, n as isize - 1) as usize));
+        let cur = t.selected().unwrap_or(0).cast_signed();
+        t.select(Some((cur + delta).clamp(0, n.cast_signed() - 1).cast_unsigned()));
         self.dirty = true;
     }
 
@@ -375,8 +385,8 @@ impl App {
     }
 
     fn go_view(&mut self, d: isize) {
-        let n = View::ALL.len() as isize;
-        self.view = View::ALL[((self.view.idx() as isize + d).rem_euclid(n)) as usize];
+        let n = View::ALL.len().cast_signed();
+        self.view = View::ALL[(self.view.idx().cast_signed() + d).rem_euclid(n).cast_unsigned()];
     }
 
     fn apply_selection_as_filter(&mut self) {
@@ -404,6 +414,14 @@ mod tests {
 
     fn key(c: KeyCode) -> KeyEvent {
         KeyEvent::new(c, KeyModifiers::NONE)
+    }
+
+    #[test]
+    fn view_idx_matches_all_order() {
+        for (n, v) in View::ALL.into_iter().enumerate() {
+            assert_eq!(v.idx(), n, "{v:?}: idx must be its position in View::ALL");
+            assert_eq!(View::ALL[v.idx()], v);
+        }
     }
 
     #[test]
@@ -551,9 +569,9 @@ mod tests {
                 "the sidebar still lists every model"
             );
         }
-        visited.sort();
+        visited.sort_unstable();
         let mut want = models.clone();
-        want.sort();
+        want.sort_unstable();
         assert_eq!(visited, want, "every model is reachable");
         press(&mut a, 'm');
         assert_eq!(a.model_filter, None, "one more press clears the filter");
@@ -572,7 +590,7 @@ mod tests {
             visited.push(a.project_filter.expect("another project to pick"));
             assert!(a.summary.total.msgs < all_msgs);
         }
-        visited.sort();
+        visited.sort_unstable();
         visited.dedup();
         assert_eq!(visited.len(), projects, "every project is reachable");
         press(&mut a, 'p');

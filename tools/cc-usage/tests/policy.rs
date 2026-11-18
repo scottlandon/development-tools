@@ -4,6 +4,7 @@
 //! These scan the production source (everything above each file's `#[cfg(test)]`) and the
 //! dependency list. If one fails, either the change breaks a promise or the promise, the README and
 //! this test need to change together, on purpose.
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -149,7 +150,7 @@ fn dependencies_are_exactly_the_reviewed_set() {
         .map(str::trim)
         .filter(|n| !n.is_empty())
         .collect();
-    names.sort();
+    names.sort_unstable();
     assert_eq!(
         names,
         ["chrono", "memchr", "ratatui", "rayon", "serde", "serde_json"],

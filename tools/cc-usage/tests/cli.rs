@@ -1,4 +1,5 @@
 //! End to end: run the real binary on synthetic transcripts and check what it prints and touches.
+#![allow(clippy::unwrap_used, clippy::expect_used, reason = "tests")]
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -242,7 +243,7 @@ fn without_any_transcript_directory_it_says_where_it_looked() {
         "{}",
         stderr(&out)
     );
-    assert!(stdout(&out).is_empty());
+    assert_eq!(stdout(&out), "");
 }
 
 #[test]

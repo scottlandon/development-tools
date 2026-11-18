@@ -2,6 +2,7 @@
 //! project names, token counts and timings come from a fixed-seed generator, so a demo never
 //! reads (or can leak) a real transcript.
 
+use crate::cast;
 use crate::data::{Dataset, ModelInfo, Row, short_model};
 use crate::pricing;
 use crate::timeutil::{self, LocalDays};
@@ -79,11 +80,11 @@ impl Builder {
                 self.rng.pick(&MODELS.map(|m| m.1))
             };
             let heavy = [1.0, 1.6, 0.5, 2.0][model];
-            let o = (self.rng.between(180.0, 2400.0) * heavy * ramp) as u32;
-            let i = self.rng.between(2.0, 900.0) as u32;
-            let cr = (self.rng.between(25_000.0, 190_000.0) * ramp) as u32;
+            let o = cast::f64_to_u32(self.rng.between(180.0, 2400.0) * heavy * ramp);
+            let i = cast::f64_to_u32(self.rng.between(2.0, 900.0));
+            let cr = cast::f64_to_u32(self.rng.between(25_000.0, 190_000.0) * ramp);
             let cw5 = if self.rng.f() < 0.35 {
-                self.rng.between(500.0, 14_000.0) as u32
+                cast::f64_to_u32(self.rng.between(500.0, 14_000.0))
             } else {
                 0
             };
@@ -91,18 +92,20 @@ impl Builder {
             self.rows.push(Row {
                 ts: t,
                 day: self.days.day(t),
-                model: model as u16,
-                project: project as u16,
+                model: cast::to_u16(model),
+                project: cast::to_u16(project),
                 session,
                 i,
                 o,
                 cr,
                 cw5,
                 cw1: 0,
-                cost: price.map_or(0.0, |p| p.cost(i as u64, o as u64, cr as u64, cw5 as u64, 0)),
+                cost: price.map_or(0.0, |p| {
+                    p.cost(u64::from(i), u64::from(o), u64::from(cr), u64::from(cw5), 0)
+                }),
                 priced: price.is_some(),
             });
-            t += self.rng.between(20.0, 150.0) as i64;
+            t += cast::f64_to_i64(self.rng.between(20.0, 150.0));
         }
     }
 }
@@ -129,17 +132,17 @@ pub fn dataset(now: i64) -> Dataset {
     let project_w = PROJECTS.map(|p| p.1);
     for age in (0..DAYS).rev() {
         let day = today - age;
-        let weekend = matches!(timeutil::weekday(day as i64), 0 | 6);
+        let weekend = matches!(timeutil::weekday(i64::from(day)), 0 | 6);
         if b.rng.f() < if weekend { 0.7 } else { 0.06 } {
             continue; // a day off
         }
         // Usage creeps up over the period, with a good day now and then.
-        let trend = 0.55 + 0.45 * (1.0 - age as f64 / DAYS as f64);
+        let trend = 0.55 + 0.45 * (1.0 - f64::from(age) / f64::from(DAYS));
         let ramp = trend * b.rng.between(0.6, 1.5);
-        let midnight = day as i64 * 86_400 - b.days.offset_secs(day as i64 * 86_400 + 43_200);
-        for _ in 0..b.rng.between(1.0, 4.0) as u32 {
-            let start = midnight + (b.rng.between(8.5, 19.0) * 3600.0) as i64;
-            let end = start + (b.rng.between(25.0, 140.0) * 60.0) as i64;
+        let midnight = i64::from(day) * 86_400 - b.days.offset_secs(i64::from(day) * 86_400 + 43_200);
+        for _ in 0..cast::f64_to_u32(b.rng.between(1.0, 4.0)) {
+            let start = midnight + cast::f64_to_i64(b.rng.between(8.5, 19.0) * 3600.0);
+            let end = start + cast::f64_to_i64(b.rng.between(25.0, 140.0) * 60.0);
             let project = b.rng.pick(&project_w);
             b.block(start, end, project, ramp);
         }

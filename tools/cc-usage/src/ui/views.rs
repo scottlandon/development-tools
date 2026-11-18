@@ -7,6 +7,7 @@ use super::theme::{pal, series};
 use super::{Tier, fmt, split_top};
 use crate::agg::Agg;
 use crate::app::{App, Metric, View};
+use crate::cast;
 use crate::timeutil::{WEEKDAYS, fmt_local_dt, fmt_local_hm, fmt_md, weekday};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -121,7 +122,7 @@ fn value(m: Metric, a: &Agg) -> f64 {
     }
 }
 
-fn agg_cells(specs: &[Spec], a: &Agg, label: Line<'static>, frac: f64, dim: bool) -> Vec<Cell<'static>> {
+fn agg_cells(specs: &[Spec], a: &Agg, label: &Line<'static>, frac: f64, dim: bool) -> Vec<Cell<'static>> {
     specs
         .iter()
         .map(|s| match s.c {
@@ -158,7 +159,7 @@ fn render_table(
         .title(cfg.title);
     let inner = block.inner(area);
     let show_footer = cfg.footer.is_some() && inner.height >= 5;
-    let rows_h = inner.height.saturating_sub(1 + show_footer as u16) as usize;
+    let rows_h = inner.height.saturating_sub(1 + u16::from(show_footer)) as usize;
     if inner.width >= 20
         && let Some(b) = cfg.bottom
     {
@@ -347,7 +348,7 @@ fn daily_chart(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(block, area);
     let axis = |v: f64| match metric {
         Metric::Cost => fmt::usd(v),
-        Metric::Tokens => fmt::tok(v as u64),
+        Metric::Tokens => fmt::tok(cast::f64_to_u64(v)),
     };
     chart::render(f.buffer_mut(), inner, &buckets, &axis, &pal().series);
 }
@@ -362,7 +363,7 @@ fn daily_table(f: &mut Frame, area: Rect, app: &mut App) {
     let n = days.len();
     let row = |i: usize| {
         let d = &days[n - 1 - i];
-        let wd = weekday(d.day as i64);
+        let wd = weekday(i64::from(d.day));
         let text = if long_label {
             format!("{} {}", WEEKDAYS[wd as usize], fmt_md(d.day))
         } else {
@@ -380,7 +381,7 @@ fn daily_table(f: &mut Frame, area: Rect, app: &mut App) {
         Row::new(agg_cells(
             &specs,
             &d.agg,
-            Line::from(Span::styled(
+            &Line::from(Span::styled(
                 text,
                 if empty { Style::default().fg(pal().dim) } else { st },
             )),
@@ -389,7 +390,7 @@ fn daily_table(f: &mut Frame, area: Rect, app: &mut App) {
         ))
     };
     let cfg = TableCfg {
-        title: title(&format!("Daily · {} days", n)),
+        title: title(&format!("Daily · {n} days")),
         bottom: Some(hint("t range · c metric")),
         specs: &specs,
         footer: Some(footer_cells(&specs, &app.summary.total)),
@@ -596,7 +597,7 @@ pub fn breakdown(f: &mut Frame, area: Rect, app: &mut App, tier: Tier) {
             spans.push(Span::styled(" ◂", Style::default().fg(pal().caution)));
         }
         let frac = if sum > 0.0 { value(metric, a) / sum } else { 0.0 };
-        Row::new(agg_cells(&specs, a, Line::from(spans), frac, false))
+        Row::new(agg_cells(&specs, a, &Line::from(spans), frac, false))
     };
     let (view, label) = if projects {
         (View::Projects, "Projects")
@@ -605,7 +606,7 @@ pub fn breakdown(f: &mut Frame, area: Rect, app: &mut App, tier: Tier) {
     };
     let n = items.len();
     // Tall pane: shrink the table to its content and show the trend below it.
-    let content_h = n as u16 + 4;
+    let content_h = cast::to_u16(n) + 4;
     let table_area = if tier != Tier::Narrow && area.height >= content_h + 9 {
         let (t, c) = split_top(area, content_h);
         daily_chart(f, c, app);
@@ -715,7 +716,7 @@ pub(super) fn live_buckets(app: &App, pick: &dyn Fn(&Agg) -> u64) -> Vec<Bucket>
 }
 
 pub fn live(f: &mut Frame, area: Rect, app: &App) {
-    let (strip, body) = split_top(area, (area.height >= 6) as u16);
+    let (strip, body) = split_top(area, u16::from(area.height >= 6));
     if strip.height > 0 {
         live_strip(f, strip, app);
     }
@@ -741,7 +742,13 @@ fn live_chart(f: &mut Frame, area: Rect, app: &App, name: &str, pick: &dyn Fn(&A
     }
     let inner = block.inner(area);
     f.render_widget(block, area);
-    chart::render(f.buffer_mut(), inner, &buckets, &|v| fmt::tok(v as u64), &pal().series);
+    chart::render(
+        f.buffer_mut(),
+        inner,
+        &buckets,
+        &|v| fmt::tok(cast::f64_to_u64(v)),
+        &pal().series,
+    );
 }
 
 /// One line of headline numbers: activity light, current rates, $/hr, recency.

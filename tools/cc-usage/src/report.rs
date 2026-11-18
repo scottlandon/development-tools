@@ -39,7 +39,7 @@ pub fn render(ds: &Dataset, days: i32, today: i32) -> String {
         )
     };
     for d in &s.days {
-        let wd = WEEKDAYS[weekday(d.day as i64) as usize];
+        let wd = WEEKDAYS[weekday(i64::from(d.day)) as usize];
         let _ = writeln!(out, "{}", row(format!("{} {}", fmt_ymd(d.day), wd), &d.agg));
     }
     let _ = writeln!(out, "{}", row("TOTAL".into(), &s.total));

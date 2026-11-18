@@ -1,5 +1,6 @@
 //! Number/text formatting that adapts to the room available.
 
+use crate::cast;
 use unicode_width_lite::truncate_to;
 
 /// 3 significant digits with K/M/B suffix: 842, 1.23K, 12.3K, 123K, 1.50M …
@@ -36,7 +37,7 @@ pub fn usd(c: f64) -> String {
     if c >= 10_000.0 {
         format!("${:.1}K", c / 1000.0)
     } else if c >= 1000.0 {
-        format!("${}", tok_full(c.round() as u64))
+        format!("${}", tok_full(cast::f64_to_u64(c.round())))
     } else {
         format!("${c:.2}")
     }
@@ -66,14 +67,14 @@ pub fn trunc(s: &str, w: usize) -> String {
 /// Horizontal bar of `w` cells filled to `frac` (0..=1) using eighth blocks.
 pub fn hbar(frac: f64, w: usize) -> String {
     const PART: [char; 8] = [' ', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
-    let eighths = (frac.clamp(0.0, 1.0) * w as f64 * 8.0).round() as usize;
+    let eighths = cast::f64_to_usize((frac.clamp(0.0, 1.0) * w as f64 * 8.0).round());
     let (full, rem) = (eighths / 8, eighths % 8);
     let mut s = "█".repeat(full.min(w));
     if full < w {
         if rem > 0 {
             s.push(PART[rem]);
         }
-        let used = full + (rem > 0) as usize;
+        let used = full + usize::from(rem > 0);
         s.push_str(&" ".repeat(w.saturating_sub(used)));
     }
     s

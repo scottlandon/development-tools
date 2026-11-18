@@ -45,12 +45,15 @@ CI runs the same on macOS and Linux. Windows isn't supported yet.
 
 ## Conventions
 
+- Lints: clippy's `pedantic` group is on, plus `unwrap_used`, `expect_used` and a few more (see `[workspace.lints]` in
+  the root `Cargo.toml`). CI treats warnings as errors, and any `#[allow]` or `#[expect]` needs a `reason = "..."`.
+
 - Match the surrounding code: naming, comment density, idiom. `rustfmt.toml` sets the line width.
 - Add tests next to the code. UI changes are covered by rendering into an in-memory terminal at many
   sizes (`tools/cc-usage/src/ui/tests.rs`).
 - Keep it light. Prefer deleting code to adding it, and think hard before adding a dependency.
 - New tool: `cargo new tools/<name>`, inherit the shared package fields with `edition.workspace = true`
-  and friends, add a README and a row in the root README.
+  and friends, add `[lints]` with `workspace = true`, a README and a row in the root README.
 
 ## The read-only rule
 

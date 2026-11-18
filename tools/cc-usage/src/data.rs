@@ -1,6 +1,7 @@
 //! Flattens the per-file scan results into one deduplicated, time-sorted row table
 //! with interned model/project/session ids and precomputed local day + cost.
 
+use crate::cast;
 use crate::pricing::{self, Price};
 use crate::scan::FileEntry;
 use crate::timeutil::LocalDays;
@@ -71,7 +72,7 @@ impl Dataset {
                 let name = entry.label.clone();
                 ds.projects
                     .push(name.unwrap_or_else(|| entry.project.trim_start_matches('-').to_string()));
-                (ds.projects.len() - 1) as u16
+                cast::wrapping_u16_id(ds.projects.len() - 1)
             });
             let si = *session_ix.entry((pi, entry.session.as_str())).or_insert_with(|| {
                 ds.sessions += 1;
@@ -86,46 +87,49 @@ impl Dataset {
                             short: short_model(m),
                             price: pricing::lookup(m),
                         });
-                        (ds.models.len() - 1) as u16
+                        cast::wrapping_u16_id(ds.models.len() - 1)
                     })
                 })
                 .collect();
 
             for r in &entry.recs {
                 let model = remap[r.model as usize];
-                match seen.get(&r.key) {
-                    Some(&ix) => {
-                        // Same message seen in another file (resumed/forked
-                        // session): keep first attribution, max output.
-                        let row = &mut ds.rows[ix];
-                        if r.o > row.o {
-                            row.o = r.o;
-                        }
+                if let Some(&ix) = seen.get(&r.key) {
+                    // Same message seen in another file (resumed/forked
+                    // session): keep first attribution, max output.
+                    let row = &mut ds.rows[ix];
+                    if r.o > row.o {
+                        row.o = r.o;
                     }
-                    None => {
-                        seen.insert(r.key, ds.rows.len());
-                        ds.rows.push(Row {
-                            ts: r.ts,
-                            day: days.day(r.ts),
-                            model,
-                            project: pi,
-                            session: si,
-                            i: r.i,
-                            o: r.o,
-                            cr: r.cr,
-                            cw5: r.cw5,
-                            cw1: r.cw1,
-                            cost: 0.0,
-                            priced: false,
-                        });
-                    }
+                } else {
+                    seen.insert(r.key, ds.rows.len());
+                    ds.rows.push(Row {
+                        ts: r.ts,
+                        day: days.day(r.ts),
+                        model,
+                        project: pi,
+                        session: si,
+                        i: r.i,
+                        o: r.o,
+                        cr: r.cr,
+                        cw5: r.cw5,
+                        cw1: r.cw1,
+                        cost: 0.0,
+                        priced: false,
+                    });
                 }
             }
         }
 
         for r in &mut ds.rows {
             if let Some(p) = ds.models[r.model as usize].price {
-                r.cost = p.cost(r.i as u64, r.o as u64, r.cr as u64, r.cw5 as u64, r.cw1 as u64);
+                r.cost = p.cost(
+                    u64::from(r.i),
+                    u64::from(r.o),
+                    u64::from(r.cr),
+                    u64::from(r.cw5),
+                    u64::from(r.cw1),
+                );
                 r.priced = true;
             }
         }

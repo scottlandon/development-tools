@@ -9,12 +9,17 @@ pub fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
-    let mp = (m as i64 + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d as i64 - 1;
+    let mp = (i64::from(m) + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + i64::from(d) - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     era * 146_097 + doe - 719_468
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "doy-in-month is 1..=31 and the month 1..=12 by construction of the algorithm"
+)]
 pub fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;
     let era = z.div_euclid(146_097);
@@ -29,6 +34,7 @@ pub fn civil_from_days(z: i64) -> (i64, u32, u32) {
 }
 
 /// 0 = Sunday .. 6 = Saturday, for a day number since the epoch.
+#[expect(clippy::cast_possible_truncation, reason = "rem_euclid(7) is 0..=6")]
 pub fn weekday(day: i64) -> u32 {
     (day + 4).rem_euclid(7) as u32
 }
@@ -45,7 +51,7 @@ pub fn parse_iso(s: &str) -> Option<i64> {
             if !c.is_ascii_digit() {
                 return None;
             }
-            n = n * 10 + (c - b'0') as i64;
+            n = n * 10 + i64::from(c - b'0');
         }
         Some(n)
     };
@@ -54,6 +60,11 @@ pub fn parse_iso(s: &str) -> Option<i64> {
     if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || se > 60 {
         return None;
     }
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "mo is checked to 1..=12 and d to 1..=31 just above"
+    )]
     let mut ts = days_from_civil(y, mo as u32, d as u32) * 86_400 + h * 3600 + mi * 60 + se;
     // Skip fractional seconds, then apply an explicit offset if present.
     let mut i = 19;
@@ -65,8 +76,8 @@ pub fn parse_iso(s: &str) -> Option<i64> {
     }
     if i + 5 < b.len() && (b[i] == b'+' || b[i] == b'-') {
         let sign = if b[i] == b'+' { 1 } else { -1 };
-        let oh = (b[i + 1] - b'0') as i64 * 10 + (b[i + 2] - b'0') as i64;
-        let om = (b[i + 4] - b'0') as i64 * 10 + (b[i + 5] - b'0') as i64;
+        let oh = i64::from(b[i + 1] - b'0') * 10 + i64::from(b[i + 2] - b'0');
+        let om = i64::from(b[i + 4] - b'0') * 10 + i64::from(b[i + 5] - b'0');
         ts -= sign * (oh * 3600 + om * 60);
     }
     Some(ts)
@@ -85,11 +96,14 @@ impl LocalDays {
             Local
                 .timestamp_opt(ts, 0)
                 .single()
-                .map(|t| t.offset().fix().local_minus_utc() as i64)
-                .unwrap_or(0)
+                .map_or(0, |t| i64::from(t.offset().fix().local_minus_utc()))
         })
     }
 
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "timestamps come from 4-digit-year ISO strings or the clock, so the day number is within about +-3.7 million"
+    )]
     pub fn day(&mut self, ts: i64) -> i32 {
         (ts + self.offset_secs(ts)).div_euclid(86_400) as i32
     }
@@ -101,13 +115,13 @@ pub fn today() -> i32 {
 
 /// `MM-DD` for a day number.
 pub fn fmt_md(day: i32) -> String {
-    let (_, m, d) = civil_from_days(day as i64);
+    let (_, m, d) = civil_from_days(i64::from(day));
     format!("{m:02}-{d:02}")
 }
 
 /// `YYYY-MM-DD` for a day number.
 pub fn fmt_ymd(day: i32) -> String {
-    let (y, m, d) = civil_from_days(day as i64);
+    let (y, m, d) = civil_from_days(i64::from(day));
     format!("{y:04}-{m:02}-{d:02}")
 }
 

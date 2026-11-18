@@ -7,6 +7,7 @@
 //! are skipped over, never stored. Per file we remember how many bytes were consumed, so a rescan
 //! only parses what was appended. Everything lives in memory; nothing is written anywhere.
 
+use crate::cast;
 use memchr::memmem;
 use rayon::prelude::*;
 use serde::Deserialize;
@@ -87,20 +88,20 @@ struct CacheCreation {
 
 /// FNV-1a: a tiny, fast hash for message identity.
 fn fnv(parts: &[&[u8]]) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for p in parts {
         for &b in *p {
-            h ^= b as u64;
-            h = h.wrapping_mul(0x100000001b3);
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
         }
         h ^= 0xff;
-        h = h.wrapping_mul(0x100000001b3);
+        h = h.wrapping_mul(0x0100_0000_01b3);
     }
     h
 }
 
 fn sat32(n: u64) -> u32 {
-    n.min(u32::MAX as u64) as u32
+    u32::try_from(n).unwrap_or(u32::MAX)
 }
 
 /// Parse complete lines from `buf`; returns the number of bytes consumed
@@ -150,13 +151,12 @@ pub fn parse_chunk(buf: &[u8], entry: &mut FileEntry) -> usize {
         if entry.label.is_none() {
             entry.label = l.cwd.as_deref().and_then(label);
         }
-        let midx = match entry.models.iter().position(|m| m == model.as_ref()) {
-            Some(p) => p,
-            None => {
-                entry.models.push(model.to_string());
-                entry.models.len() - 1
-            }
-        } as u16;
+        let midx = cast::wrapping_u16_id(if let Some(p) = entry.models.iter().position(|m| m == model.as_ref()) {
+            p
+        } else {
+            entry.models.push(model.to_string());
+            entry.models.len() - 1
+        });
         let rid = l.request_id.as_deref().unwrap_or("");
         entry.recs.push(Rec {
             key: fnv(&[id.as_bytes(), rid.as_bytes()]),
@@ -178,16 +178,13 @@ pub fn dedupe(recs: &mut Vec<Rec>) {
     let mut seen: HashMap<u64, usize> = HashMap::with_capacity(recs.len());
     let mut out: Vec<Rec> = Vec::with_capacity(recs.len());
     for r in recs.drain(..) {
-        match seen.get(&r.key) {
-            Some(&ix) => {
-                if r.o > out[ix].o {
-                    out[ix] = r;
-                }
+        if let Some(&ix) = seen.get(&r.key) {
+            if r.o > out[ix].o {
+                out[ix] = r;
             }
-            None => {
-                seen.insert(r.key, out.len());
-                out.push(r);
-            }
+        } else {
+            seen.insert(r.key, out.len());
+            out.push(r);
         }
     }
     *recs = out;
@@ -215,8 +212,7 @@ fn mtime_ns(m: &std::fs::Metadata) -> i64 {
     m.modified()
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as i64)
-        .unwrap_or(0)
+        .map_or(0, |d| i64::try_from(d.as_nanos()).unwrap_or(i64::MAX))
 }
 
 /// (project dir name, session id) from a path relative to the root.
@@ -255,9 +251,7 @@ fn label_in(cwd: &str, home: &Path) -> Option<String> {
 /// Where Claude Code keeps transcripts (`$CLAUDE_CONFIG_DIR/projects`, else `~/.claude/projects`),
 /// plus the Xcode coding assistant's copy. Only directories that exist are returned.
 pub fn default_roots() -> Vec<PathBuf> {
-    let claude = std::env::var_os("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home().join(".claude"));
+    let claude = std::env::var_os("CLAUDE_CONFIG_DIR").map_or_else(|| home().join(".claude"), PathBuf::from);
     [
         claude.join("projects"),
         home().join("Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/projects"),
@@ -316,7 +310,7 @@ impl Scanner {
                 };
                 let mut f = std::fs::File::open(path).ok()?;
                 f.seek(SeekFrom::Start(entry.offset)).ok()?;
-                let mut buf = Vec::with_capacity((size - entry.offset.min(size)) as usize);
+                let mut buf = Vec::with_capacity(usize::try_from(size - entry.offset.min(size)).unwrap_or(0));
                 f.read_to_end(&mut buf).ok()?;
                 let used = parse_chunk(&buf, &mut entry);
                 entry.offset += used as u64;
@@ -404,6 +398,7 @@ mod tests {
 
     #[test]
     fn incremental_scan_on_disk() {
+        use std::io::Write;
         let dir = std::env::temp_dir().join(format!("cc-usage-test-{}", std::process::id()));
         let proj = dir.join("-proj");
         std::fs::create_dir_all(&proj).unwrap();
@@ -412,7 +407,6 @@ mod tests {
         let mut sc = Scanner::new(vec![dir.clone()]);
         assert!(sc.scan());
         assert!(!sc.scan(), "unchanged file is skipped");
-        use std::io::Write;
         let mut h = std::fs::OpenOptions::new().append(true).open(&f).unwrap();
         writeln!(h, "{}", line("m2", "r2", 9, "2026-11-05T10:01:00Z")).unwrap();
         drop(h);

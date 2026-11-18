@@ -10,6 +10,25 @@ version = "0.1.0"
 license = "MIT"
 repository = "https://github.com/scottlandon/development-tools"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# restriction picks
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+allow_attributes_without_reason = "warn"
+# pedantic lints we deliberately don't want
+cast_precision_loss = "allow"      # u64 -> f64 for display/cost math; precision loss is irrelevant at these magnitudes
+must_use_candidate = "allow"       # noise for an application crate; nothing here is a public API
+module_name_repetitions = "allow"  # type names repeating their module name read better at call sites
+many_single_char_names = "allow"   # i/o/cr/cw are the domain's token-field names
+similar_names = "allow"            # token-field names (cr/cw, i/o) are intentionally similar
+
 [profile.release]
 opt-level = 3
 lto = "thin"
