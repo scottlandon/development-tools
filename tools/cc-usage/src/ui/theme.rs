@@ -3,8 +3,8 @@
 //! Every theme paints its own ground: "pure black" or "mocha base" is the whole point of them.
 //! Mainframe (the default) is pure black with an electric-green accent, Amber a warm phosphor tube,
 //! and Catppuccin the community Mocha flavour (<https://catppuccin.com/palette>). Daylight (warm paper,
-//! teal accent) is the light theme. Mainframe, Amber and Daylight are the "clean" variants of the palettes of the same names in
-//! the source palettes, with the accent, text and chart colours carried over.
+//! teal accent) is the light theme. Mainframe, Amber and Daylight carry over the accent, text and
+//! chart colours of the "clean" variants of existing palettes of the same names.
 //!
 //! Themes are written as hex. At draw time they resolve to 24-bit colour where the terminal supports
 //! it, otherwise to the nearest xterm-256 index, so a theme degrades instead of breaking.
