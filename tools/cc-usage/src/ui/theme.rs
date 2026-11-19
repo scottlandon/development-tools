@@ -2,9 +2,8 @@
 //!
 //! Every theme paints its own ground: "pure black" or "mocha base" is the whole point of them.
 //! Mainframe (the default) is pure black with an electric-green accent, Amber a warm phosphor tube,
-//! and Catppuccin the community Mocha flavour (<https://catppuccin.com/palette>). Strawberry Milk (a
-//! blush-pink light theme) and Daylight (warm paper, teal accent) are the two light themes. Mainframe,
-//! Amber, Strawberry Milk and Daylight are the "clean" variants of the palettes of the same names in
+//! and Catppuccin the community Mocha flavour (<https://catppuccin.com/palette>). Daylight (warm paper,
+//! teal accent) is the light theme. Mainframe, Amber and Daylight are the "clean" variants of the palettes of the same names in
 //! the source palettes, with the accent, text and chart colours carried over.
 //!
 //! Themes are written as hex. At draw time they resolve to 24-bit colour where the terminal supports
@@ -23,16 +22,14 @@ pub enum ThemeId {
     Mainframe,
     Amber,
     Catppuccin,
-    StrawberryMilk,
     Daylight,
 }
 
 impl ThemeId {
-    pub const ALL: [ThemeId; 5] = [
+    pub const ALL: [ThemeId; 4] = [
         ThemeId::Mainframe,
         ThemeId::Amber,
         ThemeId::Catppuccin,
-        ThemeId::StrawberryMilk,
         ThemeId::Daylight,
     ];
 
@@ -42,7 +39,6 @@ impl ThemeId {
             ThemeId::Mainframe => "mainframe",
             ThemeId::Amber => "amber",
             ThemeId::Catppuccin => "catppuccin",
-            ThemeId::StrawberryMilk => "strawberry-milk",
             ThemeId::Daylight => "daylight",
         }
     }
@@ -52,7 +48,6 @@ impl ThemeId {
             ThemeId::Mainframe => "Mainframe",
             ThemeId::Amber => "Amber",
             ThemeId::Catppuccin => "Catppuccin",
-            ThemeId::StrawberryMilk => "Strawberry Milk",
             ThemeId::Daylight => "Daylight",
         }
     }
@@ -174,7 +169,6 @@ fn def(id: ThemeId) -> Def {
             ],
             model_ramp: None,
         },
-        ThemeId::StrawberryMilk => strawberry_milk(),
         ThemeId::Daylight => daylight(),
         // Catppuccin Mocha: mauve accent on the "base" ground. Secondary text is overlay2 rather than the
         // dimmer overlay1, which is 4.4:1 on base and would fail the 4.5 floor the tests hold themes to.
@@ -203,38 +197,7 @@ fn def(id: ThemeId) -> Def {
     }
 }
 
-/// Strawberry Milk: bubblegum-pink ground (the source palette's surfaceAlt family, a notch deeper so it
-/// reads pink rather than blush), deep-berry lettering, strawberry-neon accent. the source palette's
-/// accent (#FF1F74) is a fill colour: it is 2.4:1 on this ground, so the text-weight accent
-/// (#A6003D) leads here, with the cream card colour as its chip lettering. Text, dim, border and
-/// selection are all berry/rose tones instead of brown cocoa; selection is a stronger pink than the
-/// ground (hover pink is too close to the ground's own value to read).
-fn strawberry_milk() -> Def {
-    Def {
-        bg: hex(0xFF_C2_D1),
-        text: hex(0x4A_12_29),
-        dim: hex(0x70_28_3F),
-        border: hex(0x9A_33_58),
-        accent: hex(0xA6_00_3D),
-        on_accent: hex(0xFF_F1_F2),
-        cost: hex(0xB0_12_3F),
-        caution: hex(0x7A_4A_00),
-        sel_bg: hex(0xFF_9F_BC),
-        series: [
-            hex(0xE0_10_5F), // c1, FF1F74 darkened to reach 3:1 on the ground
-            hex(0x74_30_4F),
-            hex(0x9A_4A_B0),
-            hex(0x1F_7A_60),
-            hex(0xCC_3D_5C),
-            hex(0x8A_5A_00), // c6, AE7A00 darkened to reach 3:1 on the ground
-            hex(0x45_69_8C),
-            hex(0xB8_30_8C),
-        ],
-        model_ramp: None,
-    }
-}
-
-/// Daylight: warm paper ground, teal accent. As with Strawberry Milk the accent slot takes
+/// Daylight: warm paper ground, teal accent. The accent slot takes
 /// the source palette's text-weight teal (#0F726B, 5.1:1) rather than the #0D9488 fill, which is 3.3:1;
 /// the chart ramp keeps the fill teal in first place. Selection is the accent at 10% over the paper.
 fn daylight() -> Def {
@@ -426,18 +389,19 @@ mod tests {
         assert_eq!(ThemeId::parse("Mainframe"), Some(ThemeId::Mainframe));
         assert_eq!(ThemeId::parse(" CATPPUCCIN\n"), Some(ThemeId::Catppuccin));
         assert_eq!(ThemeId::parse("nope"), None);
-        assert_eq!(ThemeId::parse("Strawberry-Milk"), Some(ThemeId::StrawberryMilk));
+        assert_eq!(
+            ThemeId::parse("strawberry-milk"),
+            None,
+            "a removed theme is unknown, not an error"
+        );
         assert_eq!(ThemeId::Daylight.next(), ThemeId::Mainframe);
         assert_eq!(ThemeId::Mainframe.prev(), ThemeId::Daylight);
-        assert_eq!(ThemeId::Catppuccin.next(), ThemeId::StrawberryMilk);
+        assert_eq!(ThemeId::Catppuccin.next(), ThemeId::Daylight);
         for t in ThemeId::ALL {
             assert_eq!(ThemeId::parse(t.id()), Some(t), "ids round-trip");
             assert_eq!(t.next().prev(), t, "next and prev are inverses");
         }
-        assert_eq!(
-            ThemeId::list(),
-            "mainframe, amber, catppuccin, strawberry-milk, daylight"
-        );
+        assert_eq!(ThemeId::list(), "mainframe, amber, catppuccin, daylight");
     }
 
     #[test]
@@ -479,16 +443,11 @@ mod tests {
     }
 
     #[test]
-    fn light_themes_follow_its_source_palette() {
-        let p = resolve(ThemeId::StrawberryMilk, true);
-        assert_eq!(p.bg, Color::Rgb(0xFF, 0xC2, 0xD1), "bubblegum");
-        assert_eq!(p.text, Color::Rgb(0x4A, 0x12, 0x29), "berry");
+    fn light_theme_follows_its_source_palette() {
         let p = resolve(ThemeId::Daylight, true);
         assert_eq!(p.bg, Color::Rgb(0xF3, 0xF0, 0xEA), "warm paper");
         assert_eq!(p.series[0], Color::Rgb(0x0D, 0x94, 0x88), "teal");
-        for id in [ThemeId::StrawberryMilk, ThemeId::Daylight] {
-            assert!(lum(def(id).bg) > 0.5, "{}: a light ground", id.id());
-        }
+        assert!(lum(def(ThemeId::Daylight).bg) > 0.5, "a light ground");
     }
 
     #[test]

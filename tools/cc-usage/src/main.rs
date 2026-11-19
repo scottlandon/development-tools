@@ -34,7 +34,7 @@ OPTIONS:
         --days <N>                    With --print: number of days, 1-3650 (default: 14)
         --projects-dir <PATH>         Transcript directory (repeatable; default: ~/.claude/projects)
         --refresh <SECS>              Rescan interval (default: 3)
-        --theme <NAME>                Colour theme: mainframe (default), amber, catppuccin, strawberry-milk, daylight
+        --theme <NAME>                Colour theme: mainframe (default), amber, catppuccin, daylight
         --color <auto|truecolor|256>  Colour depth (default: auto, from $COLORTERM)
         --demo                        Use synthetic data instead of reading any transcripts
     -h, --help                        Show this help

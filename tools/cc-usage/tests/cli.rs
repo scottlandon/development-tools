@@ -263,7 +263,7 @@ fn bad_arguments_exit_2_with_a_useful_message() {
         (&["--range", "bogus"][..], "unknown range 'bogus'"),
         (
             &["--theme", "neon"],
-            "choose from: mainframe, amber, catppuccin, strawberry-milk, daylight",
+            "choose from: mainframe, amber, catppuccin, daylight",
         ),
         (&["--color", "rainbow"], "unknown --color 'rainbow'"),
         (&["--days", "x"], "--days needs a number"),

@@ -532,21 +532,16 @@ fn catppuccin_paints_mocha_base_with_mauve_accents() {
 }
 
 #[test]
-fn light_themes_paint_their_own_ground() {
-    for (id, ground) in [
-        (ThemeId::StrawberryMilk, Color::Rgb(0xFF, 0xC2, 0xD1)),
-        (ThemeId::Daylight, Color::Rgb(0xF3, 0xF0, 0xEA)),
-    ] {
-        let mut app = themed(id, true);
-        let buf = render_buf(&mut app, 120, 34);
-        let on_ground = buf.content.iter().filter(|c| c.bg == ground).count();
-        assert!(
-            on_ground > buf.content.len() * 9 / 10,
-            "{}: {on_ground} of {}",
-            id.id(),
-            buf.content.len()
-        );
-    }
+fn light_theme_paints_its_own_ground() {
+    let ground = Color::Rgb(0xF3, 0xF0, 0xEA);
+    let mut app = themed(ThemeId::Daylight, true);
+    let buf = render_buf(&mut app, 120, 34);
+    let on_ground = buf.content.iter().filter(|c| c.bg == ground).count();
+    assert!(
+        on_ground > buf.content.len() * 9 / 10,
+        "{on_ground} of {}",
+        buf.content.len()
+    );
 }
 
 // ------------------------------------------------------------ golden frames
