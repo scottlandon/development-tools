@@ -40,8 +40,10 @@ CI runs the same on macOS and Linux. Windows isn't supported yet.
   about 99%; most of the rest is `main.rs`'s terminal setup.
 - **Mutation testing** shows whether the tests would notice a wrong answer, not just whether they run the code:
   `cargo install cargo-mutants`, then e.g. `cargo mutants -p cc-usage -f '**/cc-usage/src/scan.rs'`.
-  Over the logic modules (scanner, data, aggregation, app state, pricing, report, formatting) the suite catches
-  over 93% of the viable mutants; the survivors we reviewed are mostly equivalent changes (for example `>` vs `>=` on a tie).
+  Over the logic modules (scanner, data, aggregation, app state, pricing, report, formatting, model colours) the
+  suite catches about 96% of the viable mutants (507 of 525, measured 2026-11-18). The survivors are mostly
+  equivalent changes (for example `>` vs `>=` on a tie) or only cost speed (for example re-reading a file in full
+  instead of from the saved offset).
 
 ## Conventions
 
