@@ -1,0 +1,160 @@
+name: Release
+
+# Publish prebuilt binaries for one tool by pushing a tag named <tool>-v<version>,
+# e.g. `git tag cc-usage-v0.1.0 && git push origin cc-usage-v0.1.0`.
+on:
+  push:
+    tags: ["*-v[0-9]*"]
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tool: ${{ steps.parse.outputs.tool }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Parse the tag and check it matches the crate
+        id: parse
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          tool="${TAG%-v*}"
+          version="${TAG##*-v}"
+          [ -f "tools/$tool/Cargo.toml" ] || { echo "no crate at tools/$tool"; exit 1; }
+          actual=$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c "import json,sys; print(next(p['version'] for p in json.load(sys.stdin)['packages'] if p['name']==sys.argv[1]))" "$tool")
+          [ "$actual" = "$version" ] || { echo "tag says $version but $tool is $actual"; exit 1; }
+          echo "tool=$tool" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # Never ship a commit that fails the same checks CI runs on main.
+  check:
+    needs: prepare
+    name: fmt, clippy, test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: -D warnings
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rust-toolchain.toml makes rustup install stable + rustfmt + clippy on first use.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked
+      - run: cargo test --workspace --locked
+
+  # Licence notices for the crates compiled into the binary (MIT and Apache-2.0 require them to ship with it).
+  # about.toml's accepted list must match deny.toml's [licenses].allow.
+  notices:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TOOL: ${{ needs.prepare.outputs.tool }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo install --locked --features cli cargo-about@0.9.3
+      - name: Generate THIRD-PARTY-LICENSES.md
+        run: |
+          cargo about generate --locked --fail -c about.toml -m "tools/$TOOL/Cargo.toml" -o THIRD-PARTY-LICENSES.md about.hbs
+          [ -s THIRD-PARTY-LICENSES.md ] || { echo "THIRD-PARTY-LICENSES.md is empty"; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: third-party-licenses
+          path: THIRD-PARTY-LICENSES.md
+          if-no-files-found: error
+
+  build:
+    needs: [prepare, check, notices]
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm }
+    env:
+      TOOL: ${{ needs.prepare.outputs.tool }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: rustup target add "$TARGET"
+      - run: cargo build --release --locked -p "$TOOL" --target "$TARGET"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: third-party-licenses
+      - name: Package
+        run: |
+          name="$TOOL-$VERSION-$TARGET"
+          mkdir "$name"
+          cp "target/$TARGET/release/$TOOL" LICENSE THIRD-PARTY-LICENSES.md "$name/"
+          cp "tools/$TOOL/README.md" "$name/"
+          tar czf "$name.tar.gz" "$name"
+          shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            ${{ env.TOOL }}-${{ env.VERSION }}-${{ matrix.target }}.tar.gz
+            ${{ env.TOOL }}-${{ env.VERSION }}-${{ matrix.target }}.tar.gz.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # sign the provenance attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      # Lets anyone check that a binary was built by this workflow from this repo:
+      #   gh attestation verify <archive> --repo scottlandon/development-tools
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          TOOL: ${{ needs.prepare.outputs.tool }}
+        run: |
+          cat dist/*.sha256 > dist/SHA256SUMS
+          gh release create "$TAG" dist/*.tar.gz dist/SHA256SUMS \
+            --title "$TOOL ${TAG##*-v}" --generate-notes --verify-tag
