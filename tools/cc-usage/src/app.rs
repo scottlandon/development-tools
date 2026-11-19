@@ -493,7 +493,7 @@ mod tests {
         assert_eq!(a.notice.as_deref(), Some("theme: Amber"));
         a.on_key(key(KeyCode::Char('A')));
         a.on_key(key(KeyCode::Char('A')));
-        assert_eq!(a.theme, ThemeId::Catppuccin, "wraps backwards");
+        assert_eq!(a.theme, ThemeId::Daylight, "wraps backwards");
     }
 
     #[test]

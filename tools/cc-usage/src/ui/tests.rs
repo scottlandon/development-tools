@@ -398,7 +398,7 @@ fn mainframe_paints_pure_black_edge_to_edge() {
     assert!(
         others
             .iter()
-            .all(|c| matches!(c, Color::Rgb(0x14, 0x38, 0x26) | Color::Rgb(0x33, 0xFF, 0x77))),
+            .all(|c| matches!(c, Color::Rgb(0x1F, 0x27, 0x23) | Color::Rgb(0x33, 0xFF, 0x77))),
         "unexpected backgrounds: {others:?}"
     );
     // The readout is white-ish, not the terminal default.
@@ -484,6 +484,24 @@ fn catppuccin_paints_mocha_base_with_mauve_accents() {
         buf.content.iter().any(|c| c.fg == Color::Rgb(0xCD, 0xD6, 0xF4)),
         "text colour used"
     );
+}
+
+#[test]
+fn light_themes_paint_their_own_ground() {
+    for (id, ground) in [
+        (ThemeId::StrawberryMilk, Color::Rgb(0xFF, 0xD9, 0xDF)),
+        (ThemeId::Daylight, Color::Rgb(0xF3, 0xF0, 0xEA)),
+    ] {
+        let mut app = themed(id, true);
+        let buf = render_buf(&mut app, 120, 34);
+        let on_ground = buf.content.iter().filter(|c| c.bg == ground).count();
+        assert!(
+            on_ground > buf.content.len() * 9 / 10,
+            "{}: {on_ground} of {}",
+            id.id(),
+            buf.content.len()
+        );
+    }
 }
 
 // ------------------------------------------------------------ golden frames

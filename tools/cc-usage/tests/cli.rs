@@ -261,7 +261,10 @@ fn demo_needs_no_transcripts_and_touches_nothing() {
 fn bad_arguments_exit_2_with_a_useful_message() {
     for (args, want) in [
         (&["--range", "bogus"][..], "unknown range 'bogus'"),
-        (&["--theme", "neon"], "choose from: mainframe, amber, catppuccin"),
+        (
+            &["--theme", "neon"],
+            "choose from: mainframe, amber, catppuccin, strawberry-milk, daylight",
+        ),
         (&["--color", "rainbow"], "unknown --color 'rainbow'"),
         (&["--days", "x"], "--days needs a number"),
         (&["--refresh"], "--refresh needs a value"),

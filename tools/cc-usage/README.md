@@ -58,7 +58,7 @@ Press `?` inside for the key bindings and `q` to quit.
 | `--days <N>` | With `--print`: number of days (default 14) |
 | `--projects-dir <PATH>` | Read this directory instead of the defaults; repeatable |
 | `--refresh <SECS>` | Rescan interval (default 3, minimum 0.5) |
-| `--theme <NAME>` | `mainframe` (default), `amber`, `catppuccin`; `a` / `A` cycle in the TUI |
+| `--theme <NAME>` | `mainframe` (default), `amber`, `catppuccin`, `strawberry-milk`, `daylight`; `a` / `A` cycle in the TUI |
 | `--color <auto\|truecolor\|256>` | Colour depth; `auto` reads `$COLORTERM` |
 | `--demo` | Use synthetic data instead of reading any transcripts |
 | `-h`, `-V` | Help, version |
@@ -174,6 +174,8 @@ switch 15 min / 1 h / 6 h / 24 h. It redraws every second, with a `● live` / `
 | `mainframe` (default) | Pure black, white readout, electric green accent |
 | `amber` | Warm black with amber-phosphor text |
 | `catppuccin` | [Catppuccin Mocha](https://catppuccin.com/palette) base, lavender-white text, mauve accent (palette MIT, © Catppuccin) |
+| `strawberry-milk` | Light: creamy blush ground, dark cocoa text, strawberry-pink accent |
+| `daylight` | Light: warm paper ground, teal accent |
 
 | Catppuccin | Amber |
 |---|---|
