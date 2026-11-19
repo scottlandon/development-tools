@@ -440,10 +440,10 @@ fn bar_colours(buf: &Buffer) -> std::collections::HashSet<Color> {
 
 #[test]
 fn chart_bars_use_the_themes_series_colours() {
-    // Amber colours models by usage rank, straight from the theme's series.
-    let mut app = themed(ThemeId::Amber, true);
+    // Catppuccin colours models by usage rank, straight from the theme's series.
+    let mut app = themed(ThemeId::Catppuccin, true);
     let buf = render_buf(&mut app, 120, 34);
-    let p = theme::resolve(ThemeId::Amber, true);
+    let p = theme::resolve(ThemeId::Catppuccin, true);
     let seen = bar_colours(&buf);
     assert!(
         seen.contains(&p.series[0]),
@@ -457,7 +457,7 @@ fn chart_bars_use_the_themes_series_colours() {
 }
 
 #[test]
-fn mainframe_chart_bars_use_each_models_tier_colour() {
+fn mainframe_chart_bars_use_each_models_family_colour() {
     let mut app = themed(ThemeId::Mainframe, true);
     let buf = render_buf(&mut app, 120, 34);
     let by_name = |app: &App, n: &str| {
@@ -467,7 +467,8 @@ fn mainframe_chart_bars_use_each_models_tier_colour() {
     let seen = bar_colours(&buf);
     let (haiku, opus) = (by_name(&app, "claude-haiku-5-5"), by_name(&app, "claude-opus-5-5"));
     assert_ne!(haiku, opus);
-    assert_eq!(opus, Color::Rgb(0xFF, 0x5C, 0x5C), "darkest tiered model is the red");
+    assert_eq!(haiku, Color::Rgb(0x3F, 0xE0, 0xFF), "haiku is cyan");
+    assert_eq!(opus, Color::Rgb(0xFF, 0xE1, 0x4D), "opus is yellow");
     let want: std::collections::HashSet<Color> = app
         .ds
         .models

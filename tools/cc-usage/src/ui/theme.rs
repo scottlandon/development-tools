@@ -33,7 +33,7 @@ impl ThemeId {
         ThemeId::Daylight,
     ];
 
-    /// Stable identifier used by `--theme` and the saved-choice file.
+    /// Stable identifier used by `--theme`.
     pub fn id(self) -> &'static str {
         match self {
             ThemeId::Mainframe => "mainframe",
@@ -99,18 +99,19 @@ struct Def {
     sel_bg: Rgb,
     /// Chart / legend series, in rank order.
     series: [Rgb; 8],
-    /// When set, models are coloured by tier along this ramp instead of by rank.
-    model_ramp: Option<ModelRamp>,
+    /// When set, models are coloured by family from these hues instead of by rank.
+    model_hues: Option<FamilyHues>,
 }
 
-/// A light-to-dark ramp for colouring models by tier (see `ui::models`).
+/// One hue per model family, taken from the theme's own palette (see `ui::models`).
 #[derive(Clone, Copy, Debug)]
-pub struct ModelRamp {
-    /// Lightest tier.
-    light: Rgb,
-    /// Darkest tier.
-    dark: Rgb,
-    /// `series` slots for models with no recognisable tier, cycled through. Keeps them off the ramp.
+pub struct FamilyHues {
+    haiku: Rgb,
+    sonnet: Rgb,
+    opus: Rgb,
+    /// Fable and Mythos.
+    fable: Rgb,
+    /// `series` slots for models of no recognised family, cycled through. Keeps them off the family hues.
     pub other: &'static [usize],
 }
 
@@ -138,12 +139,14 @@ fn def(id: ThemeId) -> Def {
                 hex(0x3F_E0_FF),
                 hex(0xFF_E1_4D),
             ],
-            // Models run light to dark by tier, Haiku pale and the newest Fable the series red. The
-            // untiered ones take the non-red, non-grey slots: accent, cyan, yellow, magenta, orange.
-            model_ramp: Some(ModelRamp {
-                light: hex(0xF2_F2_F2),
-                dark: hex(0xFF_5C_5C),
-                other: &[0, 6, 7, 5, 4],
+            // One hue per family: cyan Haiku, green Sonnet, yellow Opus, red Fable. Models of any
+            // other family take white, magenta, orange and grey.
+            model_hues: Some(FamilyHues {
+                haiku: hex(0x3F_E0_FF),
+                sonnet: hex(0x33_FF_77),
+                opus: hex(0xFF_E1_4D),
+                fable: hex(0xFF_5C_5C),
+                other: &[1, 5, 4, 2],
             }),
         },
         // Amber: the P3 amber tube. Warm black ground, text in the phosphor's own tone.
@@ -167,7 +170,14 @@ fn def(id: ThemeId) -> Def {
                 hex(0x7F_D3_FF),
                 hex(0x9C_8B_76),
             ],
-            model_ramp: None,
+            // Sky Haiku, green Sonnet, amber Opus, red Fable; others take cream, violet, pink, taupe.
+            model_hues: Some(FamilyHues {
+                haiku: hex(0x7F_D3_FF),
+                sonnet: hex(0x8C_E0_8C),
+                opus: hex(0xFF_B0_00),
+                fable: hex(0xFF_5F_56),
+                other: &[1, 5, 4, 7],
+            }),
         },
         ThemeId::Daylight => daylight(),
         // Catppuccin Mocha: mauve accent on the "base" ground. Secondary text is overlay2 rather than the
@@ -192,7 +202,7 @@ fn def(id: ThemeId) -> Def {
                 hex(0x94_E2_D5), // teal
                 hex(0xF3_8B_A8), // red
             ],
-            model_ramp: None,
+            model_hues: None,
         },
     }
 }
@@ -221,7 +231,7 @@ fn daylight() -> Def {
             hex(0xEA_58_0C),
             hex(0x64_74_8B),
         ],
-        model_ramp: None,
+        model_hues: None,
     }
 }
 
@@ -238,33 +248,71 @@ pub struct Pal {
     pub caution: Color,
     pub sel_bg: Color,
     pub series: [Color; 8],
-    pub model_ramp: Option<ModelRamp>,
+    pub model_hues: Option<FamilyHues>,
+    bg_rgb: Rgb,
     truecolor: bool,
 }
 
 impl Pal {
-    /// Step `i` of `n` along the model ramp, light (0) to dark (`n - 1`); a lone step is the dark
-    /// end. `None` when the theme colours models by rank. Steps are blended in RGB and then
-    /// resolved like every other colour, so 256-colour terminals get the nearest xterm index.
-    pub fn ramp_step(&self, i: usize, n: usize) -> Option<Color> {
-        let r = self.model_ramp?;
-        let (at, den) = if n <= 1 {
-            (1, 1)
+    /// The colour of a model of `tier` (0 Haiku, 1 Sonnet, 2 Opus, 3 Fable or Mythos) with `back`
+    /// newer versions in its family out of `of` in all. The newest is the family hue itself; each
+    /// older one is blended 30% further toward the ground, with the total capped where the colour
+    /// would fall under 3:1 against it, so the versions stay legible and distinct. `None` when the
+    /// theme colours models by rank. Resolved like every other colour, so 256-colour terminals get
+    /// the nearest xterm index.
+    pub fn family_shade(&self, tier: u8, back: usize, of: usize) -> Option<Color> {
+        let h = self.model_hues?;
+        let hue = match tier {
+            0 => h.haiku,
+            1 => h.sonnet,
+            2 => h.opus,
+            _ => h.fable,
+        };
+        let bg = self.bg_rgb;
+        let blend = |pm: i32| {
+            let mix = |a: u8, b: u8| {
+                let (a, b) = (i32::from(a), i32::from(b));
+                u8::try_from(a + ((b - a) * pm + 500).div_euclid(1000)).unwrap_or(u8::MAX)
+            };
+            (mix(hue.0, bg.0), mix(hue.1, bg.1), mix(hue.2, bg.2))
+        };
+        // Largest blend (per mille) that still reads against the ground.
+        let (mut lo, mut hi) = (0, 1000);
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2;
+            if contrast(blend(mid), bg) >= 3.0 {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        let step = if of > 1 {
+            (lo / i32::try_from(of - 1).unwrap_or(i32::MAX)).min(300)
         } else {
-            let den = i64::try_from(n - 1).unwrap_or(i64::MAX);
-            (i64::try_from(i).unwrap_or(i64::MAX).min(den), den)
+            0
         };
-        let mix = |a: u8, b: u8| {
-            let (a, b) = (i64::from(a), i64::from(b));
-            u8::try_from(a + ((b - a) * at + den / 2).div_euclid(den)).unwrap_or(u8::MAX)
-        };
-        let rgb = (
-            mix(r.light.0, r.dark.0),
-            mix(r.light.1, r.dark.1),
-            mix(r.light.2, r.dark.2),
-        );
-        Some(to_color(rgb, self.truecolor))
+        let pm = step.saturating_mul(i32::try_from(back).unwrap_or(i32::MAX));
+        Some(to_color(blend(pm), self.truecolor))
     }
+}
+
+/// Relative luminance of an sRGB colour.
+fn lum((r, g, b): Rgb) -> f64 {
+    let ch = |v: u8| {
+        let v = f64::from(v) / 255.0;
+        if v <= 0.03928 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+}
+
+/// WCAG contrast ratio.
+fn contrast(a: Rgb, b: Rgb) -> f64 {
+    let (x, y) = (lum(a), lum(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
 }
 
 pub fn resolve(id: ThemeId, truecolor: bool) -> Pal {
@@ -281,7 +329,8 @@ pub fn resolve(id: ThemeId, truecolor: bool) -> Pal {
         caution: c(d.caution),
         sel_bg: c(d.sel_bg),
         series: d.series.map(c),
-        model_ramp: d.model_ramp,
+        model_hues: d.model_hues,
+        bg_rgb: d.bg,
         truecolor,
     }
 }
@@ -365,24 +414,6 @@ pub fn fill_style() -> Style {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn lum((r, g, b): Rgb) -> f64 {
-        let ch = |v: u8| {
-            let v = f64::from(v) / 255.0;
-            if v <= 0.03928 {
-                v / 12.92
-            } else {
-                ((v + 0.055) / 1.055).powf(2.4)
-            }
-        };
-        0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
-    }
-
-    /// WCAG contrast ratio.
-    fn contrast(a: Rgb, b: Rgb) -> f64 {
-        let (x, y) = (lum(a), lum(b));
-        (x.max(y) + 0.05) / (x.min(y) + 0.05)
-    }
 
     #[test]
     fn parse_and_cycle() {

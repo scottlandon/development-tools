@@ -1,12 +1,13 @@
-//! Per-model colours. Most themes colour models by usage rank (`theme::series`); a theme with a
-//! model ramp (Mainframe) colours them by tier instead, light Haiku to the darkest Fable, so a model
-//! keeps its colour whatever the filter or time window does to its rank.
+//! Per-model colours. Most themes colour models by usage rank (`theme::series`); a theme with family
+//! hues (Mainframe, Amber) gives each family its own colour instead, the newest version in the
+//! dataset the hue itself and older ones progressively dimmer, so a model keeps its colour whatever
+//! the filter or time window does to its rank.
 
 use super::theme::{pal, series};
 use crate::data::Dataset;
 use ratatui::style::Color;
 
-/// Tier per family, lightest to darkest. Mythos shares Fable's tier.
+/// Tier per family. Mythos shares Fable's tier, and so its hue.
 const FAMILIES: [(&str, u8); 5] = [("haiku", 0), ("sonnet", 1), ("opus", 2), ("fable", 3), ("mythos", 3)];
 
 /// A model's tier and (major, minor) version, read from its full id: `claude-opus-4-1-20250805` is
@@ -51,7 +52,7 @@ fn version(toks: &[&str]) -> Option<(u32, u32)> {
 pub fn model_color(ds: &Dataset, rank: &[u32], id: u32) -> Color {
     let by_rank = || series(rank.iter().position(|r| *r == id).unwrap_or(id as usize));
     let p = pal();
-    let Some(ramp) = p.model_ramp else {
+    let Some(hues) = p.model_hues else {
         return by_rank();
     };
     let Some(me) = ds.models.get(id as usize).map(|m| m.name.as_str()) else {
@@ -59,14 +60,14 @@ pub fn model_color(ds: &Dataset, rank: &[u32], id: u32) -> Color {
     };
     let key = |name: &str| tier_version(name).map(|tv| (tv, name.to_owned()));
     let names = || ds.models.iter().map(|m| m.name.as_str());
-    if let Some(mine) = key(me) {
-        // Position among every tiered model in the dataset, so it never depends on the filter.
-        let tiered: Vec<_> = names().filter_map(key).collect();
-        let below = tiered.iter().filter(|k| **k < mine).count();
-        p.ramp_step(below, tiered.len()).unwrap_or_else(by_rank)
+    if let Some(mine @ ((tier, _), _)) = key(me) {
+        // Position among every model of the family in the dataset, so it never depends on the filter.
+        let family: Vec<_> = names().filter_map(key).filter(|k| k.0.0 == tier).collect();
+        let newer = family.iter().filter(|k| **k > mine).count();
+        p.family_shade(tier, newer, family.len()).unwrap_or_else(by_rank)
     } else {
         let nth = names().filter(|n| tier_version(n).is_none() && *n < me).count();
-        series(ramp.other[nth % ramp.other.len()])
+        series(hues.other[nth % hues.other.len()])
     }
 }
 
@@ -122,36 +123,86 @@ mod tests {
         assert_eq!(tier_version(""), None);
     }
 
-    #[test]
-    fn mainframe_models_run_light_to_red_by_tier() {
-        set_current(resolve(ThemeId::Mainframe, true));
-        let d = ds(&[
-            "claude-fable-5-2",
-            "claude-haiku-5-5",
-            "claude-fable-5-1",
-            "claude-opus-5-5",
-            "claude-sonnet-5-5",
-        ]);
+    const FIVE: [&str; 5] = [
+        "claude-fable-5-2",
+        "claude-haiku-5-5",
+        "claude-fable-5-1",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+    ];
+
+    fn rgb(hex: u32) -> Color {
+        let [_, r, g, b] = hex.to_be_bytes();
+        Color::Rgb(r, g, b)
+    }
+
+    fn contrast(a: Color, b: Color) -> f64 {
+        let (x, y) = (lum(a), lum(b));
+        (x.max(y) + 0.05) / (x.min(y) + 0.05)
+    }
+
+    /// A theme's family hues, the dimming of the older Fable, and nothing sharing a colour.
+    fn check_families(id: ThemeId, bg: Color, [haiku, sonnet, opus, fable]: [u32; 4]) {
+        set_current(resolve(id, true));
+        let d = ds(&FIVE);
         let rank: Vec<u32> = (0..5).collect();
-        // Ascending tier / version: haiku, sonnet, opus, fable-5-1, fable-5-2.
-        let cols: Vec<Color> = [1, 4, 3, 2, 0].iter().map(|&i| model_color(&d, &rank, i)).collect();
-        for w in cols.windows(2) {
-            assert!(lum(w[0]) > lum(w[1]), "strictly darker: {w:?}");
-        }
-        assert_eq!(cols[4], Color::Rgb(0xFF, 0x5C, 0x5C), "newest fable is the series red");
-        let black = lum(Color::Rgb(0, 0, 0));
-        for c in &cols {
-            assert!((lum(*c) + 0.05) / (black + 0.05) >= 3.0, "{c:?} reads on black");
-        }
-        let distinct: std::collections::HashSet<_> = cols.iter().collect();
-        assert_eq!(distinct.len(), cols.len());
+        let col = |i| model_color(&d, &rank, i);
+        assert_eq!(col(1), rgb(haiku));
+        assert_eq!(col(4), rgb(sonnet));
+        assert_eq!(col(3), rgb(opus));
+        assert_eq!(col(0), rgb(fable), "newest fable is the family hue");
+        let old = col(2);
+        assert!(lum(old) < lum(rgb(fable)), "older fable is dimmer: {old:?}");
+        assert!(contrast(old, bg) >= 3.0, "{old:?} reads on the ground");
+        let (Color::Rgb(r, g, b), Color::Rgb(fr, fg, fb)) = (old, rgb(fable)) else {
+            panic!("not truecolor")
+        };
+        assert!(r > g && r > b && fr > fg && fr > fb, "still red: {old:?}");
+        let all: std::collections::HashSet<_> = (0..5).map(col).collect();
+        assert_eq!(all.len(), 5, "every model its own colour");
     }
 
     #[test]
-    fn a_lone_model_is_the_dark_end() {
+    fn mainframe_colours_models_by_family() {
+        check_families(
+            ThemeId::Mainframe,
+            Color::Rgb(0, 0, 0),
+            [0x3F_E0_FF, 0x33_FF_77, 0xFF_E1_4D, 0xFF_5C_5C],
+        );
+    }
+
+    #[test]
+    fn amber_colours_models_by_family() {
+        check_families(
+            ThemeId::Amber,
+            Color::Rgb(0x15, 0x0F, 0x08),
+            [0x7F_D3_FF, 0x8C_E0_8C, 0xFF_B0_00, 0xFF_5F_56],
+        );
+    }
+
+    #[test]
+    fn dimming_steps_back_one_version_at_a_time() {
         set_current(resolve(ThemeId::Mainframe, true));
-        let d = ds(&["claude-haiku-5-5"]);
-        assert_eq!(model_color(&d, &[0], 0), Color::Rgb(0xFF, 0x5C, 0x5C));
+        let d = ds(&["claude-opus-4", "claude-opus-4-1", "claude-opus-4-5", "claude-opus-5-1"]);
+        let rank: Vec<u32> = (0..4).collect();
+        let cols: Vec<Color> = (0..4).rev().map(|i| model_color(&d, &rank, i)).collect();
+        assert_eq!(cols[0], rgb(0xFF_E1_4D));
+        for w in cols.windows(2) {
+            assert!(lum(w[0]) > lum(w[1]), "each older version dimmer: {w:?}");
+            assert!(contrast(w[1], Color::Rgb(0, 0, 0)) >= 3.0, "{w:?}");
+        }
+    }
+
+    #[test]
+    fn mythos_shares_fables_hue_but_not_its_shade() {
+        set_current(resolve(ThemeId::Mainframe, true));
+        let alone = ds(&["claude-mythos-5-2"]);
+        assert_eq!(model_color(&alone, &[0], 0), rgb(0xFF_5C_5C));
+        let both = ds(&["claude-mythos-5-2", "claude-fable-5-2"]);
+        let (m, f) = (model_color(&both, &[0, 1], 0), model_color(&both, &[0, 1], 1));
+        assert_ne!(m, f);
+        assert_eq!(m, rgb(0xFF_5C_5C), "mythos sorts after fable on a version tie");
+        assert!(lum(f) < lum(m));
     }
 
     #[test]
@@ -166,30 +217,49 @@ mod tests {
     }
 
     #[test]
-    fn untiered_models_stay_off_the_ramp() {
-        let p = resolve(ThemeId::Mainframe, true);
-        set_current(p);
-        let d = ds(&["claude-opus-5-5", "mystery-a", "mystery-b"]);
-        let (a, b) = (model_color(&d, &[], 1), model_color(&d, &[], 2));
-        assert_eq!(a, p.series[0]);
-        assert_ne!(a, b);
-        assert!(![a, b].contains(&p.series[3]), "never the red");
+    fn unknown_families_take_the_other_slots() {
+        for (id, other) in [(ThemeId::Mainframe, [1, 5, 4, 2]), (ThemeId::Amber, [1, 5, 4, 7])] {
+            let p = resolve(id, true);
+            set_current(p);
+            let d = ds(&[
+                "claude-haiku-5-5",
+                "claude-sonnet-5-5",
+                "claude-opus-5-5",
+                "claude-fable-5-1",
+                "mystery-a",
+                "mystery-b",
+                "mystery-c",
+                "mystery-d",
+                "mystery-e",
+            ]);
+            let fam: Vec<Color> = (0..4).map(|i| model_color(&d, &[], i)).collect();
+            for n in 0..5_u32 {
+                let c = model_color(&d, &[], 4 + n);
+                assert_eq!(c, p.series[other[n as usize % 4]]);
+                assert!(!fam.contains(&c), "{id:?}: never a family colour");
+            }
+        }
     }
 
     #[test]
-    fn other_themes_colour_by_rank() {
-        let p = resolve(ThemeId::Amber, true);
-        set_current(p);
-        let d = ds(&["claude-haiku-5-5", "claude-opus-5-5"]);
-        assert_eq!(model_color(&d, &[1, 0], 1), p.series[0]);
-        assert_eq!(model_color(&d, &[1, 0], 0), p.series[1]);
+    fn catppuccin_and_daylight_colour_by_rank() {
+        for id in [ThemeId::Catppuccin, ThemeId::Daylight] {
+            let p = resolve(id, true);
+            set_current(p);
+            let d = ds(&["claude-haiku-5-5", "claude-opus-5-5"]);
+            assert_eq!(model_color(&d, &[1, 0], 1), p.series[0]);
+            assert_eq!(model_color(&d, &[1, 0], 0), p.series[1]);
+        }
     }
 
     #[test]
-    fn ramp_resolves_to_xterm_indices_without_truecolor() {
-        set_current(resolve(ThemeId::Mainframe, false));
-        let d = ds(&["claude-haiku-5-5", "claude-fable-5-2"]);
-        assert!(matches!(model_color(&d, &[0, 1], 0), Color::Indexed(_)));
-        assert!(matches!(model_color(&d, &[0, 1], 1), Color::Indexed(_)));
+    fn families_resolve_to_xterm_indices_without_truecolor() {
+        for id in [ThemeId::Mainframe, ThemeId::Amber] {
+            set_current(resolve(id, false));
+            let d = ds(&["claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2", "mystery"]);
+            for i in 0..4 {
+                assert!(matches!(model_color(&d, &[0, 1], i), Color::Indexed(_)));
+            }
+        }
     }
 }
