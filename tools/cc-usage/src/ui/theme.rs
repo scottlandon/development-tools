@@ -139,14 +139,14 @@ fn def(id: ThemeId) -> Def {
                 hex(0x3F_E0_FF),
                 hex(0xFF_E1_4D),
             ],
-            // One hue per family: cyan Haiku, green Sonnet, yellow Opus, red Fable. Models of any
-            // other family take white, magenta, orange and grey.
+            // One hue per family: cyan Haiku, green Sonnet, yellow Opus, magenta Fable. Models of
+            // any other family take white, orange and grey, never Fable's magenta.
             model_hues: Some(FamilyHues {
                 haiku: hex(0x3F_E0_FF),
                 sonnet: hex(0x33_FF_77),
                 opus: hex(0xFF_E1_4D),
-                fable: hex(0xFF_5C_5C),
-                other: &[1, 5, 4, 2],
+                fable: hex(0xFF_4F_D8),
+                other: &[1, 4, 2],
             }),
         },
         // Amber: the P3 amber tube. Warm black ground, text in the phosphor's own tone.

@@ -157,7 +157,10 @@ mod tests {
         let (Color::Rgb(r, g, b), Color::Rgb(fr, fg, fb)) = (old, rgb(fable)) else {
             panic!("not truecolor")
         };
-        assert!(r > g && r > b && fr > fg && fr > fb, "still red: {old:?}");
+        assert!(
+            (r.cmp(&g), r.cmp(&b), g.cmp(&b)) == (fr.cmp(&fg), fr.cmp(&fb), fg.cmp(&fb)),
+            "dimmed, not shifted to another hue: {old:?}"
+        );
         let all: std::collections::HashSet<_> = (0..5).map(col).collect();
         assert_eq!(all.len(), 5, "every model its own colour");
     }
@@ -167,7 +170,7 @@ mod tests {
         check_families(
             ThemeId::Mainframe,
             Color::Rgb(0, 0, 0),
-            [0x3F_E0_FF, 0x33_FF_77, 0xFF_E1_4D, 0xFF_5C_5C],
+            [0x3F_E0_FF, 0x33_FF_77, 0xFF_E1_4D, 0xFF_4F_D8],
         );
     }
 
@@ -197,11 +200,11 @@ mod tests {
     fn mythos_shares_fables_hue_but_not_its_shade() {
         set_current(resolve(ThemeId::Mainframe, true));
         let alone = ds(&["claude-mythos-5-2"]);
-        assert_eq!(model_color(&alone, &[0], 0), rgb(0xFF_5C_5C));
+        assert_eq!(model_color(&alone, &[0], 0), rgb(0xFF_4F_D8));
         let both = ds(&["claude-mythos-5-2", "claude-fable-5-2"]);
         let (m, f) = (model_color(&both, &[0, 1], 0), model_color(&both, &[0, 1], 1));
         assert_ne!(m, f);
-        assert_eq!(m, rgb(0xFF_5C_5C), "mythos sorts after fable on a version tie");
+        assert_eq!(m, rgb(0xFF_4F_D8), "mythos sorts after fable on a version tie");
         assert!(lum(f) < lum(m));
     }
 
@@ -218,7 +221,8 @@ mod tests {
 
     #[test]
     fn unknown_families_take_the_other_slots() {
-        for (id, other) in [(ThemeId::Mainframe, [1, 5, 4, 2]), (ThemeId::Amber, [1, 5, 4, 7])] {
+        let themes: [(_, &[usize]); 2] = [(ThemeId::Mainframe, &[1, 4, 2]), (ThemeId::Amber, &[1, 5, 4, 7])];
+        for (id, other) in themes {
             let p = resolve(id, true);
             set_current(p);
             let d = ds(&[
@@ -235,7 +239,7 @@ mod tests {
             let fam: Vec<Color> = (0..4).map(|i| model_color(&d, &[], i)).collect();
             for n in 0..5_u32 {
                 let c = model_color(&d, &[], 4 + n);
-                assert_eq!(c, p.series[other[n as usize % 4]]);
+                assert_eq!(c, p.series[other[n as usize % other.len()]]);
                 assert!(!fam.contains(&c), "{id:?}: never a family colour");
             }
         }
