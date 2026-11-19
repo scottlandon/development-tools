@@ -396,6 +396,7 @@ mod tests {
             cw1: 3,
             cost,
             priced: true,
+            fast: false,
         }
     }
 
@@ -727,6 +728,7 @@ mod tests {
             cw1: 0,
             cost: 0.5,
             priced: true,
+            fast: false,
         }
     }
 

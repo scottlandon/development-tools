@@ -22,6 +22,8 @@ pub struct Row {
     /// API-equivalent USD; 0 when the model has no known price.
     pub cost: f64,
     pub priced: bool,
+    /// Sent in fast mode, so priced at fast-mode rates.
+    pub fast: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -135,6 +137,7 @@ impl Dataset {
                         cw1: r.cw1,
                         cost: 0.0,
                         priced: false,
+                        fast: r.fast,
                     });
                 }
             }
@@ -142,7 +145,7 @@ impl Dataset {
 
         for r in &mut ds.rows {
             if let Some(p) = ds.models[r.model as usize].price {
-                r.cost = p.cost(
+                r.cost = p.at_speed(r.fast).cost(
                     u64::from(r.i),
                     u64::from(r.o),
                     u64::from(r.cr),
@@ -180,6 +183,7 @@ mod tests {
             cr: 0,
             cw5: 0,
             cw1: 0,
+            fast: false,
         }
     }
 
@@ -310,6 +314,26 @@ mod tests {
         );
         assert!(!mystery.priced);
         assert_eq!(mystery.cost, 0.0);
+    }
+
+    #[test]
+    fn a_fast_message_costs_twice_the_same_message_at_standard_speed() {
+        let mut files = BTreeMap::new();
+        let mut std = rec(1, 10, 1_000);
+        std.cr = 5_000;
+        std.cw5 = 2_000;
+        std.cw1 = 3_000;
+        let fast = Rec {
+            key: 2,
+            fast: true,
+            ..std
+        };
+        files.insert("a".into(), file("-p", "s", None, "claude-opus-5-5", vec![std, fast]));
+        let ds = Dataset::build(&files);
+        let (a, b) = (&ds.rows[0], &ds.rows[1]);
+        assert!(!a.fast && b.fast);
+        assert!(a.cost > 0.0);
+        assert!((b.cost - 2.0 * a.cost).abs() < 1e-12, "{} vs {}", b.cost, a.cost);
     }
 
     #[test]

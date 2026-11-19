@@ -42,6 +42,7 @@ OPTIONS:
 
 Inside the TUI press ? for key bindings.
 Costs are API-equivalent estimates; built-in prices were last checked {PRICES}.
+Fast-mode messages use fast-mode rates; US-only data residency (1.1x) is not modelled.
 ";
 
 struct Args {

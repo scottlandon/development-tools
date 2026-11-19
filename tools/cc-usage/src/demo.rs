@@ -104,6 +104,7 @@ impl Builder {
                     p.cost(u64::from(i), u64::from(o), u64::from(cr), u64::from(cw5), 0)
                 }),
                 priced: price.is_some(),
+                fast: false,
             });
             t += cast::f64_to_i64(self.rng.between(20.0, 150.0));
         }

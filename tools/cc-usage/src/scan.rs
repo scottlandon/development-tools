@@ -30,6 +30,8 @@ pub struct Rec {
     pub cr: u32,
     pub cw5: u32,
     pub cw1: u32,
+    /// Sent in fast mode (`usage.speed == "fast"`).
+    pub fast: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -68,16 +70,19 @@ struct Msg<'a> {
     #[serde(borrow, default)]
     model: Option<Cow<'a, str>>,
     #[serde(default)]
-    usage: Option<Usage>,
+    usage: Option<Usage<'a>>,
 }
 
 #[derive(Deserialize)]
-struct Usage {
+struct Usage<'a> {
     input_tokens: Option<u64>,
     output_tokens: Option<u64>,
     cache_creation_input_tokens: Option<u64>,
     cache_read_input_tokens: Option<u64>,
     cache_creation: Option<CacheCreation>,
+    /// `"fast"` or `"standard"`; absent in older transcripts (standard).
+    #[serde(borrow, default)]
+    speed: Option<Cow<'a, str>>,
 }
 
 #[derive(Deserialize)]
@@ -133,6 +138,7 @@ pub fn parse_chunk(buf: &[u8], entry: &mut FileEntry) -> usize {
             continue;
         };
 
+        let fast = usage.speed.as_deref() == Some("fast");
         let i = usage.input_tokens.unwrap_or(0);
         let o = usage.output_tokens.unwrap_or(0);
         let cr = usage.cache_read_input_tokens.unwrap_or(0);
@@ -167,6 +173,7 @@ pub fn parse_chunk(buf: &[u8], entry: &mut FileEntry) -> usize {
             cr: sat32(cr),
             cw5: sat32(cw5),
             cw1: sat32(cw1),
+            fast,
         });
     }
     consumed
@@ -716,6 +723,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!((r.cw5, r.cw1), (4, 6));
+    }
+
+    #[test]
+    fn speed_fast_is_parsed_and_anything_else_is_standard() {
+        assert!(parsed(r#"{"output_tokens":1,"speed":"fast"}"#).unwrap().fast);
+        assert!(!parsed(r#"{"output_tokens":1,"speed":"standard"}"#).unwrap().fast);
+        assert!(
+            !parsed(r#"{"output_tokens":1}"#).unwrap().fast,
+            "older transcripts omit it"
+        );
+        assert!(!parsed(r#"{"output_tokens":1,"speed":null}"#).unwrap().fast);
     }
 
     #[test]

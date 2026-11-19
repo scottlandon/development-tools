@@ -20,7 +20,7 @@
 │Wed 11-05   1.35K │ r               rescan now                                 │                  │
 │Tue 11-04   1.35K │ q  Ctrl-C       quit                                       │                  │
 │Mon 11-03   1.35K │                                                            │                  │
-│Sun 11-02   1.35K ╰ prices checked 2026-11-06 ─────────────── any key to close ╯                  │
+│Sun 11-02   1.35K ╰ prices checked 2026-11-18 ─────────────── any key to close ╯                  │
 │Sat 11-01   1.35K   16.6K    135K   3.75M   3.90M    $0.64      6 █████▏                          │
 │Fri 10-31   1.35K   16.8K    135K   3.75M   3.90M    $0.95      6 ███████▋                        │
 │Thu 10-30   1.35K   17.0K    135K   3.75M   3.90M    $0.83      6 ██████▋                         │

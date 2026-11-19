@@ -56,6 +56,7 @@ fn dataset(days: i32) -> Dataset {
                 cw1: 0,
                 cost,
                 priced: models[model as usize].price.is_some(),
+                fast: false,
             });
         }
     }

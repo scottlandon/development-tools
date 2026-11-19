@@ -578,6 +578,7 @@ mod tests {
                     cr: 0,
                     cw5: 0,
                     cw1: 0,
+                    fast: false,
                 })
                 .collect(),
             ..Default::default()

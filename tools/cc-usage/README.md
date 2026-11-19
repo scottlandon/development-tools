@@ -107,7 +107,8 @@ held in memory and is gone when you quit.
 
 **Cost.** Token counts times a built-in price table, so it's an **API-equivalent estimate**: subscription plans
 aren't billed per token. Cache writes use the 5-minute (1.25×) and 1-hour (2×) rates from the transcript's
-`cache_creation` breakdown. Models with no known price show `n/a` and are left out of cost, never priced at $0.
+`cache_creation` breakdown. Messages sent in fast mode (`usage.speed`) are priced at the fast-mode rates; US-only
+data residency (1.1×) is not modelled. Models with no known price show `n/a` and are left out of cost, never priced at $0.
 The table (`src/pricing.rs`) was last checked against Anthropic's published pricing on the date shown in
 `cc-usage --help` and the `?` overlay. It handles the models whose cache reads aren't 0.1× input and Haiku 5.5's
 higher rate for prompts over 100k tokens. To change a price, edit that file and rebuild.

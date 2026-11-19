@@ -6,7 +6,7 @@
 /// When the built-in table was last checked against Anthropic's published pricing
 /// (<https://platform.claude.com/docs/en/about-claude/pricing>). Shown in `--help` and the `?` overlay
 /// so a stale table is visible. Bump it whenever you re-verify the entries below.
-pub const PRICES_VERIFIED: &str = "2026-11-06";
+pub const PRICES_VERIFIED: &str = "2026-11-18";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Price {
@@ -18,6 +18,8 @@ pub struct Price {
     /// `(threshold, multiplier)`: a message whose whole prompt (input + cache reads + cache writes)
     /// exceeds `threshold` tokens bills every rate at `multiplier`x. Haiku 5.5 is tiered this way.
     pub long_prompt: Option<(u64, f64)>,
+    /// `(input, output)` dollars per million tokens in fast mode, for the few models that offer it.
+    pub fast: Option<(f64, f64)>,
 }
 
 impl Price {
@@ -31,12 +33,36 @@ impl Price {
             write_5m: input * 1.25,
             write_1h: input * 2.0,
             long_prompt: None,
+            fast: None,
         }
     }
 
     const fn long_prompt(mut self, threshold: u64, multiplier: f64) -> Self {
         self.long_prompt = Some((threshold, multiplier));
         self
+    }
+
+    const fn fast(mut self, input: f64, output: f64) -> Self {
+        self.fast = Some((input, output));
+        self
+    }
+
+    /// The rates for a message sent in fast mode (`fast`), or `self` unchanged for standard speed
+    /// and for models with no fast rate. Caching multipliers apply on top of the fast input price,
+    /// so the model's own cache-read multiplier is kept and writes are 1.25x / 2x the fast input.
+    pub fn at_speed(self, fast: bool) -> Price {
+        match self.fast {
+            Some((input, output)) if fast => Price {
+                input,
+                output,
+                cache_read: self.cache_read * (input / self.input),
+                write_5m: input * 1.25,
+                write_1h: input * 2.0,
+                long_prompt: self.long_prompt,
+                fast: None,
+            },
+            _ => self,
+        }
     }
 
     pub fn cost(&self, i: u64, o: u64, cr: u64, cw5: u64, cw1: u64) -> f64 {
@@ -55,13 +81,15 @@ impl Price {
 
 /// Order matters: most specific patterns first.
 const TABLE: &[(&str, Price)] = &[
-    ("fable-5-2", Price::new(8.0, 40.0, 0.20)),
+    ("fable-5-2", Price::new(8.0, 40.0, 0.20).fast(16.0, 80.0)),
     ("fable-5-1", Price::new(10.0, 50.0, 0.25)),
     ("fable", Price::new(10.0, 50.0, 1.0)),
-    ("mythos-5-2", Price::new(8.0, 40.0, 0.20)),
+    ("mythos-5-2", Price::new(8.0, 40.0, 0.20).fast(16.0, 80.0)),
     ("mythos-5-1", Price::new(10.0, 50.0, 0.25)),
     ("mythos", Price::new(10.0, 50.0, 1.0)),
-    ("opus-5-5", Price::new(4.0, 20.0, 0.20)),
+    ("opus-5-5", Price::new(4.0, 20.0, 0.20).fast(8.0, 40.0)),
+    ("opus-5", Price::new(5.0, 25.0, 0.50).fast(10.0, 50.0)),
+    ("opus-4-8", Price::new(5.0, 25.0, 0.50).fast(10.0, 50.0)),
     ("opus-4-1", Price::new(15.0, 75.0, 1.50)),
     ("opus-4-2025", Price::new(15.0, 75.0, 1.50)),
     ("3-opus", Price::new(15.0, 75.0, 1.50)),
@@ -117,6 +145,54 @@ mod tests {
         }
         let p = lookup("claude-sonnet-5-5").unwrap();
         assert_eq!((p.write_5m, p.write_1h), (2.5, 4.0));
+    }
+
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn fast_mode_rates_for_every_supported_model() {
+        // (model, standard input, fast input, fast output, cache-read multiplier)
+        let cases = [
+            ("claude-fable-5-2", 8.0, 16.0, 80.0, 0.025),
+            ("claude-mythos-5-2", 8.0, 16.0, 80.0, 0.025),
+            ("claude-opus-5-5", 4.0, 8.0, 40.0, 0.05),
+            ("claude-opus-5", 5.0, 10.0, 50.0, 0.1),
+            ("claude-opus-4-8", 5.0, 10.0, 50.0, 0.1),
+        ];
+        for (m, std_in, fast_in, fast_out, read_mult) in cases {
+            let std = lookup(m).unwrap();
+            assert_eq!(std.input, std_in, "{m}");
+            let f = std.at_speed(true);
+            assert_eq!((f.input, f.output), (fast_in, fast_out), "{m}");
+            assert!(close(f.cache_read, read_mult * fast_in), "{m}: {}", f.cache_read);
+            assert_eq!((f.write_5m, f.write_1h), (fast_in * 1.25, fast_in * 2.0), "{m}");
+            assert_eq!(f.fast, None, "{m}");
+            assert_eq!(f.long_prompt, std.long_prompt, "{m}");
+        }
+        let p = lookup("claude-opus-5-5").unwrap().at_speed(true);
+        assert!(close(p.cache_read, 0.40));
+        assert_eq!((p.write_5m, p.write_1h), (10.0, 16.0));
+        let p = lookup("claude-fable-5-2").unwrap().at_speed(true);
+        assert!(close(p.cache_read, 0.40));
+        assert_eq!((p.write_5m, p.write_1h), (20.0, 32.0));
+    }
+
+    #[test]
+    fn fast_lookup_order_keeps_the_specific_opus_entries() {
+        assert_eq!(lookup("claude-opus-5-5").unwrap().at_speed(true).input, 8.0);
+        assert_eq!(lookup("claude-opus-4-1-20250805").unwrap().input, 15.0);
+        assert_eq!(lookup("claude-opus-4-1-20250805").unwrap().fast, None);
+        assert_eq!(lookup("claude-opus-4-6").unwrap().fast, None);
+    }
+
+    #[test]
+    fn speed_is_identity_without_fast_rates_or_when_standard() {
+        let s = lookup("claude-sonnet-5-5").unwrap();
+        assert_eq!(s.at_speed(true), s, "no fast rate: priced at standard");
+        let o = lookup("claude-opus-5-5").unwrap();
+        assert_eq!(o.at_speed(false), o);
     }
 
     #[test]
