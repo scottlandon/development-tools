@@ -32,8 +32,8 @@ OPTIONS:
     -r, --range <1d|7d|30d|90d|all>   Initial time range (default: 7d)
         --print                       Print a plain-text report and exit (no TUI)
         --days <N>                    With --print: number of days, 1-3650 (default: 14)
-        --projects-dir <PATH>         Transcript directory (repeatable; default: ~/.claude/projects)
-        --refresh <SECS>              Rescan interval (default: 3)
+        --projects-dir <PATH>         Transcript directory (repeatable; replaces the default locations)
+        --refresh <SECS>              Rescan interval, 0.5-3600 (default: 3)
         --theme <NAME>                Colour theme: mainframe (default), amber, catppuccin, daylight
         --color <auto|truecolor|256>  Colour depth (default: auto, from $COLORTERM)
         --demo                        Use synthetic data instead of reading any transcripts

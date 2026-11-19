@@ -16,6 +16,14 @@ Each tool lives in its own crate under [`tools/`](tools) and ships as a standalo
 
 <sub>Synthetic demo data (`cc-usage --demo`), not real usage.</sub>
 
+Four colour themes (`--theme`, or `a` / `A` in the TUI); [details](tools/cc-usage/README.md#themes):
+
+| **Mainframe** (default) | **Amber** |
+|---|---|
+| ![Live view in Mainframe, the default theme](tools/cc-usage/docs/live.png) | ![Projects view in Amber](tools/cc-usage/docs/amber.png) |
+| **Catppuccin** | **Daylight** |
+| ![Models view in Catppuccin Mocha](tools/cc-usage/docs/catppuccin.png) | ![Daily view in Daylight, the light theme](tools/cc-usage/docs/daylight.png) |
+
 More will land here over time.
 
 ## Install
@@ -30,8 +38,9 @@ against `SHA256SUMS` (or with `gh attestation verify`), unpack it, and put the b
 cargo install --locked --git https://github.com/scottlandon/development-tools cc-usage
 ```
 
-or from a clone: `cargo install --locked --path tools/cc-usage`, or `cargo run --release -p cc-usage -- --demo` to try it on
-synthetic data without installing.
+or from a clone: `cargo install --locked --path tools/cc-usage` (or `scripts/install.sh`, which builds in release mode and
+copies the binary to `~/.local/bin`), or `cargo run --release -p cc-usage -- --demo` to try it on synthetic data without
+installing.
 
 Every tool has its own README with usage, flags and details.
 
@@ -43,7 +52,7 @@ x86-64 / arm64 Linux. Windows is not supported yet.
 ## Privacy
 
 The tools run entirely on your machine. `cc-usage` only reads: it opens Claude Code's `*.jsonl` transcripts
-(under `~/.claude/projects`) and nothing else, keeps only token counts, model names, timestamps and project
+(by default under `~/.claude/projects`) and nothing else, keeps only token counts, model names, timestamps and project
 folder names, writes no files, and makes no network connections. Tests and CI enforce this.
 [Details and a way to verify it yourself](tools/cc-usage/README.md#what-it-reads-exactly).
 
@@ -51,13 +60,17 @@ folder names, writes no files, and makes no network connections. Tests and CI en
 
 ```
 .
-├── Cargo.toml          workspace manifest (members = tools/*)
+├── Cargo.toml          workspace manifest (members = tools/*) and shared lints
 ├── Cargo.lock          committed, so binary builds are reproducible
 ├── rust-toolchain.toml dev toolchain (stable + rustfmt + clippy)
 ├── rustfmt.toml        shared formatting rules
+├── clippy.toml         clippy settings (allows unwrap / expect in tests; lint levels are in Cargo.toml)
 ├── deny.toml           dependency policy (advisories, licences, sources, no network crates)
-├── about.toml          third-party licence notices for release archives (cargo-about; template: about.hbs)
-├── .github/            CI, release workflow, Dependabot, issue / PR templates
+├── about.toml          cargo-about config for the third-party licence notices in release archives
+├── about.hbs           template for those notices
+├── LICENSE             MIT
+├── scripts/            install.sh (build and install a tool), screenshots.sh (regenerate the README images)
+├── .github/            CI, release and price-check workflows, Dependabot, issue / PR templates
 └── tools/
     └── cc-usage/       one crate per tool
 ```

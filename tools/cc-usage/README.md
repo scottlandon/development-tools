@@ -56,9 +56,9 @@ Press `?` inside for the key bindings and `q` to quit.
 |--------|---------|
 | `-r, --range <1d\|7d\|30d\|90d\|all>` | Initial time range (default `7d`) |
 | `--print` | Print a plain-text report and exit; no TUI |
-| `--days <N>` | With `--print`: number of days (default 14) |
+| `--days <N>` | With `--print`: number of days, 1 to 3650 (default 14; larger values are clamped) |
 | `--projects-dir <PATH>` | Read this directory instead of the defaults; repeatable |
-| `--refresh <SECS>` | Rescan interval (default 3, minimum 0.5) |
+| `--refresh <SECS>` | Rescan interval (default 3; clamped to 0.5 to 3600) |
 | `--theme <NAME>` | `mainframe` (default), `amber`, `catppuccin`, `daylight`; `a` / `A` cycle in the TUI |
 | `--color <auto\|truecolor\|256>` | Colour depth; `auto` reads `$COLORTERM` |
 | `--demo` | Use synthetic data instead of reading any transcripts |
@@ -90,6 +90,7 @@ looked at. From each parsed line cc-usage takes exactly:
 | `timestamp` | which day / minute the message belongs to |
 | `message.model` | per-model breakdown and pricing |
 | `message.usage.input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` (split by `cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`) | the token counts |
+| `message.usage.speed` | whether the message was sent in fast mode (only `"fast"` counts), for pricing |
 | `message.id`, `requestId` | de-duplication (Claude Code writes a message several times while it streams; the copy with the most output tokens wins). Only a hash of the pair is kept. |
 | `cwd` | the project name: just the last folder (`~` for your home directory). The full path is not kept. |
 
@@ -108,8 +109,8 @@ held in memory and is gone when you quit.
 
 **Cost.** Token counts times a built-in price table, so it's an **API-equivalent estimate**: subscription plans
 aren't billed per token. Cache writes use the 5-minute (1.25×) and 1-hour (2×) rates from the transcript's
-`cache_creation` breakdown. Messages sent in fast mode (`usage.speed`) are priced at the fast-mode rates; US-only
-data residency (1.1×) is not modelled. Models with no known price show `n/a` and are left out of cost, never priced at $0.
+`cache_creation` breakdown. Messages sent in fast mode (`usage.speed` is `"fast"`) are priced at the fast-mode rates, which are 2× on the few
+models that offer it (Fable 5.2, Mythos 5.2, Opus 5.5, Opus 5, Opus 4.8); US-only data residency (1.1×) is not modelled. Models with no known price show `n/a` and are left out of cost, never priced at $0.
 The table (`src/pricing.rs`) was last checked against Anthropic's published pricing on the date shown in
 `cc-usage --help` and the `?` overlay. It handles the models whose cache reads aren't 0.1× input and Haiku 5.5's
 higher rate for prompts over 100k tokens. To change a price, edit that file and rebuild.
@@ -158,9 +159,10 @@ sandbox-exec -f /tmp/readonly.sb cc-usage --print --days 3
 
 `1` Daily (stacked chart by model + table) · `2` Models · `3` Projects · `4` Sessions · `5` Live.
 
-Keys: `Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` `g` `G` page / first / last ·
+Keys: `Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` (or `Ctrl-d` `Ctrl-u`) page, `g` `G` (or `Home` `End`) first / last ·
 `t` / `T` change time range · `c` cost ⇄ tokens · `m` / `p` cycle model / project filter · `Enter` filter by the
 selected model or project · `Esc` clear filters · `s` sort sessions · `a` / `A` theme · `r` rescan · `?` help · `q` quit.
+A filter stays on the same model or project across rescans.
 
 **Live** shows tokens per minute (stacked by model) and output tokens per minute over a sliding window; `t` / `T`
 switch 15 min / 1 h / 6 h / 24 h. It redraws every second, with a `● live` / `○ idle` light, current rates
@@ -170,18 +172,23 @@ switch 15 min / 1 h / 6 h / 24 h. It redraws every second, with a `● live` / `
 
 ## Themes
 
-| Theme | Look |
-|-------|------|
-| `mainframe` (default) | Pure black, white readout, electric green accent |
-| `amber` | Warm black with amber-phosphor text |
-| `catppuccin` | [Catppuccin Mocha](https://catppuccin.com/palette) base, lavender-white text, mauve accent (palette MIT, © Catppuccin) |
-| `daylight` | Light: warm paper ground, teal accent |
+| Theme | Look | Models |
+|-------|------|--------|
+| `mainframe` (default) | Pure black, white readout, electric green accent | Phosphor greens, pale Haiku to deep Fable |
+| `amber` | Warm black with amber-phosphor text | Yellow-amber Haiku to burnt-orange Fable |
+| `catppuccin` | [Catppuccin Mocha](https://catppuccin.com/palette) base, lavender-white text, mauve accent (palette MIT, © Catppuccin) | Lavender to mauve |
+| `daylight` | Light: warm paper ground, teal accent | Slate greys, with Fable in teal |
 
-| Catppuccin | Amber |
+| **Mainframe** (default) | **Amber** |
 |---|---|
-| ![Models view in Catppuccin Mocha](docs/catppuccin.png) | ![Projects view in Amber](docs/amber.png) |
-| **Daylight** | |
-| ![Daily view in Daylight, the light theme](docs/daylight.png) | |
+| ![Daily view in Mainframe, the default theme](docs/daily.png) | ![Projects view in Amber](docs/amber.png) |
+| **Catppuccin** | **Daylight** |
+| ![Models view in Catppuccin Mocha](docs/catppuccin.png) | ![Daily view in Daylight, the light theme](docs/daylight.png) |
+
+Models are coloured by family, not by how much they were used, so a model keeps its colour whatever the filter
+or time range. Each theme gives Haiku, Sonnet, Opus and Fable (Mythos shares Fable's colour) its own hue, and
+older versions of a family are a dimmer shade of it, the newest in the data being the hue itself. Models of an
+unrecognised family take other colours from the theme's palette, never the family hues.
 
 Every theme paints its own background. Colours are 24-bit when `$COLORTERM` says truecolor, otherwise mapped to
 the nearest xterm-256 colour (force either with `--color truecolor|256`). Tests hold every theme to contrast floors.

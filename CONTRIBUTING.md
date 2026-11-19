@@ -45,9 +45,10 @@ CI runs the same on macOS and Linux. Windows isn't supported yet.
 
 ## Conventions
 
-- Lints: clippy's `pedantic` group is on, plus `unwrap_used`, `expect_used` and a few more (see `[workspace.lints]` in
-  the root `Cargo.toml`). CI treats warnings as errors, and any `#[allow]` or `#[expect]` needs a `reason = "..."`.
-
+- Lints: clippy's `pedantic` group is on, plus a few restriction lints (`unwrap_used`, `expect_used`, `dbg_macro`,
+  `todo`, `unimplemented`, `allow_attributes_without_reason`), and `unsafe` is forbidden. They are set once in
+  `[workspace.lints]` in the root `Cargo.toml`; `clippy.toml` lets tests use `unwrap` and `expect`. CI treats warnings
+  as errors, and any `#[allow]` or `#[expect]` needs a `reason = "..."`.
 - Match the surrounding code: naming, comment density, idiom. `rustfmt.toml` sets the line width.
 - Add tests next to the code. UI changes are covered by rendering into an in-memory terminal at many
   sizes (`tools/cc-usage/src/ui/tests.rs`).
@@ -80,13 +81,15 @@ commit the new PNGs; the tapes live in `tools/cc-usage/docs/tapes/`, one per ima
 
 `cc-usage` ships a built-in price table (`tools/cc-usage/src/pricing.rs`). When Anthropic changes
 pricing, update the table against <https://platform.claude.com/docs/en/about-claude/pricing> and bump
-`PRICES_VERIFIED` in the same commit. Check cache-read rates (not every model is 0.1× input) and any
-long-prompt tiers.
+`PRICES_VERIFIED` in the same commit. Check cache-read rates (not every model is 0.1× input), any
+long-prompt tiers, and the fast-mode rates of the models that have them.
 
 A weekly workflow (`price-check.yml`) opens an issue when `PRICES_VERIFIED` is more than 60 days old.
 
 ## Releasing (maintainer)
 
-Bump the crate version, merge, then push a tag named `<tool>-v<version>`, for example
-`cc-usage-v0.2.0`. The Release workflow builds macOS and Linux binaries and attaches them, with
-checksums and a signed build-provenance attestation, to a GitHub release.
+Bump the crate version (`cc-usage` inherits `version` from `[workspace.package]` in the root `Cargo.toml`), merge, then
+push a tag named `<tool>-v<version>`, for example `cc-usage-v0.2.0`; the workflow fails if the tag and the crate
+version disagree. The Release workflow first runs fmt, clippy and the tests on macOS and Linux, and generates
+`THIRD-PARTY-LICENSES.md`. It then builds the four targets and attaches the archives (binary, README, `LICENSE`,
+`THIRD-PARTY-LICENSES.md`), with `SHA256SUMS` and a signed build-provenance attestation, to a GitHub release.

@@ -5,4 +5,4 @@
 ## Checklist
 
 - [ ] `cargo fmt --all`, `cargo clippy --workspace --all-targets` and `cargo test --workspace` are clean
-- [ ] Screenshots / output use `--demo` data, not my real Claude Code usage
+- [ ] Screenshots / output use `--demo` data, not my real Claude Code usage (if the UI or colours changed, the images in `tools/cc-usage/docs/` are regenerated with `scripts/screenshots.sh`)
