@@ -18,7 +18,7 @@ Worth reporting:
 - anything that breaks those promises: a file written, a socket opened, a program run, or a file read that
   isn't a transcript;
 - transcript content (prompts, replies, tool output, keys) being kept, shown or logged, since only counts,
-  model names, timestamps and project folder names should survive parsing;
+  model names, timestamps, project folder names and a fast-mode yes/no flag should survive parsing;
 - a crash or unbounded resource use on a crafted transcript file.
 
 Only the latest release is supported.

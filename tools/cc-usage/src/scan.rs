@@ -3,8 +3,8 @@
 //! Claude Code appends one JSON object per line to `<projects>/<proj>/<session>.jsonl`
 //! (plus `<session>/subagents/*.jsonl`). We look only at `*.jsonl` files and only at lines carrying
 //! `message.usage`, and from those lines we keep nothing but numbers, the model name, a timestamp,
-//! two ids used to de-duplicate, and the project's folder name. Message text and tool input/output
-//! are skipped over, never stored. Per file we remember how many bytes were consumed, so a rescan
+//! two ids used to de-duplicate, the project's folder name and a fast-mode yes/no flag. Message text and tool
+//! input/output are skipped over, never stored. Per file we remember how many bytes were consumed, so a rescan
 //! only parses what was appended. Everything lives in memory; nothing is written anywhere.
 
 use crate::cast;
@@ -492,7 +492,7 @@ mod tests {
     }
 
     /// The transcript line holds the whole conversation. Whatever else is in it, the only things
-    /// that may survive parsing are the numbers, the model, the ids' hash and the folder name.
+    /// that may survive parsing are the numbers, the model, the ids' hash, the folder name and the fast-mode flag.
     #[test]
     fn message_content_is_never_retained() {
         let secret = "sk-ant-api03-TOPSECRET";

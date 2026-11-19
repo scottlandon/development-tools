@@ -63,10 +63,10 @@ CI runs the same on macOS and Linux. Windows isn't supported yet.
 ## The read-only rule
 
 `cc-usage` only reads transcripts. It writes no files, opens no sockets, runs no programs, and keeps only
-token counts, model names, timestamps and project folder names. `tools/cc-usage/tests/policy.rs` enforces this
-on the production source and the dependency list, and `deny.toml` bans network crates. If a change needs to
-break one of these, the README, `SECURITY.md` and the test have to change in the same PR, on purpose.
-Filesystem access belongs in `scan.rs` and nowhere else.
+token counts, model names, timestamps, project folder names and a fast-mode yes/no flag per message.
+`tools/cc-usage/tests/policy.rs` enforces this on the production source and the dependency list, and `deny.toml` bans
+network crates. If a change needs to break one of these, the README, `SECURITY.md` and the test have to change in the
+same PR, on purpose. Filesystem access belongs in `scan.rs` and nowhere else.
 
 ## Privacy
 

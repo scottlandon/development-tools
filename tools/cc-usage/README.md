@@ -90,7 +90,7 @@ looked at. From each parsed line cc-usage takes exactly:
 | `timestamp` | which day / minute the message belongs to |
 | `message.model` | per-model breakdown and pricing |
 | `message.usage.input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` (split by `cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`) | the token counts |
-| `message.usage.speed` | whether the message was sent in fast mode (only `"fast"` counts), for pricing |
+| `message.usage.speed` | a yes/no flag for whether the message was sent in fast mode (only `"fast"` counts), for pricing; the string itself is not kept |
 | `message.id`, `requestId` | de-duplication (Claude Code writes a message several times while it streams; the copy with the most output tokens wins). Only a hash of the pair is kept. |
 | `cwd` | the project name: just the last folder (`~` for your home directory). The full path is not kept. |
 
@@ -100,7 +100,8 @@ The session is the transcript's file name, and the project directory name is the
 inputs and tool output, which can include secrets that passed through a session. To find the numbers, cc-usage
 reads each file into memory and its JSON parser steps over everything else in the line. None of it is stored,
 displayed, logged or written. After parsing, all that exists is the table above (numbers, model name,
-timestamps, a hash, a folder name). A test feeds it a line full of fake keys and checks that none survive.
+timestamps, a hash, a folder name, a fast-mode yes/no flag). A test feeds it a line full of fake keys and checks that
+none survive.
 
 **When.** The first scan happens at launch and takes a moment on a large history (roughly half a second for
 750 MB on an Apple-silicon laptop). After that a background thread rescans every few seconds, parsing only
@@ -109,8 +110,9 @@ held in memory and is gone when you quit.
 
 **Cost.** Token counts times a built-in price table, so it's an **API-equivalent estimate**: subscription plans
 aren't billed per token. Cache writes use the 5-minute (1.25×) and 1-hour (2×) rates from the transcript's
-`cache_creation` breakdown. Messages sent in fast mode (`usage.speed` is `"fast"`) are priced at the fast-mode rates, which are 2× on the few
-models that offer it (Fable 5.2, Mythos 5.2, Opus 5.5, Opus 5, Opus 4.8); US-only data residency (1.1×) is not modelled. Models with no known price show `n/a` and are left out of cost, never priced at $0.
+`cache_creation` breakdown. Messages sent in fast mode (`usage.speed` is `"fast"`) are priced at the fast-mode rates,
+which are 2× on the few models that offer it (Fable 5.2, Mythos 5.2, Opus 5.5, Opus 5, Opus 4.8); US-only data
+residency (1.1×) is not modelled. Models with no known price show `n/a` and are left out of cost, never priced at $0.
 The table (`src/pricing.rs`) was last checked against Anthropic's published pricing on the date shown in
 `cc-usage --help` and the `?` overlay. It handles the models whose cache reads aren't 0.1× input and Haiku 5.5's
 higher rate for prompts over 100k tokens. To change a price, edit that file and rebuild.
@@ -159,9 +161,10 @@ sandbox-exec -f /tmp/readonly.sb cc-usage --print --days 3
 
 `1` Daily (stacked chart by model + table) · `2` Models · `3` Projects · `4` Sessions · `5` Live.
 
-Keys: `Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` (or `Ctrl-d` `Ctrl-u`) page, `g` `G` (or `Home` `End`) first / last ·
-`t` / `T` change time range · `c` cost ⇄ tokens · `m` / `p` cycle model / project filter · `Enter` filter by the
-selected model or project · `Esc` clear filters · `s` sort sessions · `a` / `A` theme · `r` rescan · `?` help · `q` quit.
+Keys: `Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` (or `Ctrl-d` `Ctrl-u`) page, `g` `G`
+(or `Home` `End`) first / last · `t` / `T` change time range · `c` cost ⇄ tokens · `m` / `p` cycle model / project
+filter · `Enter` filter by the selected model or project · `Esc` clear filters · `s` sort sessions · `a` / `A` theme ·
+`r` rescan · `?` help · `q` quit.
 A filter stays on the same model or project across rescans.
 
 **Live** shows tokens per minute (stacked by model) and output tokens per minute over a sliding window; `t` / `T`

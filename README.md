@@ -38,9 +38,9 @@ against `SHA256SUMS` (or with `gh attestation verify`), unpack it, and put the b
 cargo install --locked --git https://github.com/scottlandon/development-tools cc-usage
 ```
 
-or from a clone: `cargo install --locked --path tools/cc-usage` (or `scripts/install.sh`, which builds in release mode and
-copies the binary to `~/.local/bin`), or `cargo run --release -p cc-usage -- --demo` to try it on synthetic data without
-installing.
+or from a clone: `cargo install --locked --path tools/cc-usage` (or `scripts/install.sh`, which builds in release mode
+and copies the binary to `~/.local/bin`), or `cargo run --release -p cc-usage -- --demo` to try it on synthetic data
+without installing.
 
 Every tool has its own README with usage, flags and details.
 
@@ -52,8 +52,9 @@ x86-64 / arm64 Linux. Windows is not supported yet.
 ## Privacy
 
 The tools run entirely on your machine. `cc-usage` only reads: it opens Claude Code's `*.jsonl` transcripts
-(by default under `~/.claude/projects`) and nothing else, keeps only token counts, model names, timestamps and project
-folder names, writes no files, and makes no network connections. Tests and CI enforce this.
+(by default under `~/.claude/projects`) and nothing else, keeps only token counts, model names, timestamps, project
+folder names and a fast-mode yes/no flag per message, writes no files, and makes no network connections. Tests and CI
+enforce this.
 [Details and a way to verify it yourself](tools/cc-usage/README.md#what-it-reads-exactly).
 
 ## Repository layout
