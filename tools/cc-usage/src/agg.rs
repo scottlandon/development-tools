@@ -781,6 +781,38 @@ mod tests {
         assert_eq!(l.last_msg_ago, Some(0), "a future timestamp never gives a negative age");
     }
 
+    /// For every window size, a message lands in the bar for its age: the
+    /// current bar, one step back, five steps back, and a future-stamped one
+    /// folds into the last bar. Every other bar stays empty, and the result
+    /// reports the window and bar width it was asked for (not the default).
+    #[test]
+    fn live_messages_land_in_the_bar_matching_their_age_for_every_window() {
+        const T: i64 = 1_700_000_123;
+        for window in [LiveWindow::M15, LiveWindow::H1, LiveWindow::H6, LiveWindow::H24] {
+            let step = window.step();
+            let end = (T.div_euclid(step) + 1) * step;
+            let rows = vec![
+                live_row(T - 5 * step, 0, 0, 100), // five bars back
+                live_row(T - step, 0, 0, 10),      // one bar back
+                live_row(T, 0, 0, 1),              // the current bar
+                live_row(end + 7, 0, 0, 1000),     // future (clock skew): last bar too
+            ];
+            let l = compute_live(&dataset_of(rows), Filter::default(), window, T);
+
+            assert_eq!(l.window, window, "{window:?}");
+            assert_eq!(l.step, window.step(), "{window:?}");
+            assert_eq!(l.buckets.len(), LIVE_BUCKETS, "{window:?}");
+            let mut expected = [(0_u64, 0_u64); LIVE_BUCKETS];
+            expected[LIVE_BUCKETS - 6] = (1, 100);
+            expected[LIVE_BUCKETS - 2] = (1, 10);
+            expected[LIVE_BUCKETS - 1] = (2, 1001);
+            for (i, (b, (msgs, o))) in l.buckets.iter().zip(expected).enumerate() {
+                assert_eq!((b.agg.msgs, b.agg.o), (msgs, o), "{window:?} bar {i}");
+            }
+            assert_eq!(l.total.o, 1111, "{window:?}");
+        }
+    }
+
     #[test]
     fn live_last_message_age_and_fifteen_minute_boundary() {
         let rows = vec![
