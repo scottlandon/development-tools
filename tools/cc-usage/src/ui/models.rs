@@ -182,11 +182,18 @@ mod tests {
 
     #[test]
     fn amber_colours_models_by_family() {
-        check_families(
-            ThemeId::Amber,
-            Color::Rgb(0x15, 0x0F, 0x08),
-            [0x7F_D3_FF, 0x8C_E0_8C, 0xFF_B0_00, 0xFF_5F_56],
-        );
+        let fam = [0xFF_E4_B0, 0xFF_CB_6B, 0xFF_B0_00, 0xC9_8A_00];
+        let bg = Color::Rgb(0x15, 0x0F, 0x08);
+        check_families(ThemeId::Amber, bg, fam);
+        // All amber, so depth is the cue: strictly darker from Haiku up to Fable.
+        assert!(fam.windows(2).all(|w| lum(rgb(w[0])) > lum(rgb(w[1]))), "{fam:x?}");
+        let d = ds(&FIVE);
+        let rank: Vec<u32> = (0..5).collect();
+        let old = model_color(&d, &rank, 2);
+        assert!(contrast(old, bg) >= 3.0, "{old:?}");
+        for i in [0, 1, 3, 4] {
+            assert_ne!(old, model_color(&d, &rank, i), "older fable vs model {i}");
+        }
     }
 
     #[test]
@@ -227,7 +234,7 @@ mod tests {
 
     #[test]
     fn unknown_families_take_the_other_slots() {
-        let themes: [(_, &[usize]); 2] = [(ThemeId::Mainframe, &[1, 4, 2]), (ThemeId::Amber, &[1, 5, 4, 7])];
+        let themes: [(_, &[usize]); 2] = [(ThemeId::Mainframe, &[1, 4, 2]), (ThemeId::Amber, &[6, 3, 5, 4])];
         for (id, other) in themes {
             let p = resolve(id, true);
             set_current(p);

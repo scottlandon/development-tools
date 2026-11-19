@@ -170,13 +170,14 @@ fn def(id: ThemeId) -> Def {
                 hex(0x7F_D3_FF),
                 hex(0x9C_8B_76),
             ],
-            // Sky Haiku, green Sonnet, amber Opus, red Fable; others take cream, violet, pink, taupe.
+            // Amber phosphor: one amber per family, pale Haiku to deep Fable, so weight reads as depth.
+            // Models of any other family take sky, green, violet and pink, none of them amber.
             model_hues: Some(FamilyHues {
-                haiku: hex(0x7F_D3_FF),
-                sonnet: hex(0x8C_E0_8C),
+                haiku: hex(0xFF_E4_B0),
+                sonnet: hex(0xFF_CB_6B),
                 opus: hex(0xFF_B0_00),
-                fable: hex(0xFF_5F_56),
-                other: &[1, 5, 4, 7],
+                fable: hex(0xC9_8A_00),
+                other: &[6, 3, 5, 4],
             }),
         },
         ThemeId::Daylight => daylight(),
