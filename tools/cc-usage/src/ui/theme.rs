@@ -104,6 +104,19 @@ struct Def {
     sel_bg: Rgb,
     /// Chart / legend series, in rank order.
     series: [Rgb; 8],
+    /// When set, models are coloured by tier along this ramp instead of by rank.
+    model_ramp: Option<ModelRamp>,
+}
+
+/// A light-to-dark ramp for colouring models by tier (see `ui::models`).
+#[derive(Clone, Copy, Debug)]
+pub struct ModelRamp {
+    /// Lightest tier.
+    light: Rgb,
+    /// Darkest tier.
+    dark: Rgb,
+    /// `series` slots for models with no recognisable tier, cycled through. Keeps them off the ramp.
+    pub other: &'static [usize],
 }
 
 fn def(id: ThemeId) -> Def {
@@ -130,6 +143,13 @@ fn def(id: ThemeId) -> Def {
                 hex(0x3F_E0_FF),
                 hex(0xFF_E1_4D),
             ],
+            // Models run light to dark by tier, Haiku pale and the newest Fable the series red. The
+            // untiered ones take the non-red, non-grey slots: accent, cyan, yellow, magenta, orange.
+            model_ramp: Some(ModelRamp {
+                light: hex(0xF2_F2_F2),
+                dark: hex(0xFF_5C_5C),
+                other: &[0, 6, 7, 5, 4],
+            }),
         },
         // Amber: the P3 amber tube. Warm black ground, text in the phosphor's own tone.
         ThemeId::Amber => Def {
@@ -152,6 +172,7 @@ fn def(id: ThemeId) -> Def {
                 hex(0x7F_D3_FF),
                 hex(0x9C_8B_76),
             ],
+            model_ramp: None,
         },
         ThemeId::StrawberryMilk => strawberry_milk(),
         ThemeId::Daylight => daylight(),
@@ -177,6 +198,7 @@ fn def(id: ThemeId) -> Def {
                 hex(0x94_E2_D5), // teal
                 hex(0xF3_8B_A8), // red
             ],
+            model_ramp: None,
         },
     }
 }
@@ -208,6 +230,7 @@ fn strawberry_milk() -> Def {
             hex(0x45_69_8C),
             hex(0xB8_30_8C),
         ],
+        model_ramp: None,
     }
 }
 
@@ -235,6 +258,7 @@ fn daylight() -> Def {
             hex(0xEA_58_0C),
             hex(0x64_74_8B),
         ],
+        model_ramp: None,
     }
 }
 
@@ -251,6 +275,33 @@ pub struct Pal {
     pub caution: Color,
     pub sel_bg: Color,
     pub series: [Color; 8],
+    pub model_ramp: Option<ModelRamp>,
+    truecolor: bool,
+}
+
+impl Pal {
+    /// Step `i` of `n` along the model ramp, light (0) to dark (`n - 1`); a lone step is the dark
+    /// end. `None` when the theme colours models by rank. Steps are blended in RGB and then
+    /// resolved like every other colour, so 256-colour terminals get the nearest xterm index.
+    pub fn ramp_step(&self, i: usize, n: usize) -> Option<Color> {
+        let r = self.model_ramp?;
+        let (at, den) = if n <= 1 {
+            (1, 1)
+        } else {
+            let den = i64::try_from(n - 1).unwrap_or(i64::MAX);
+            (i64::try_from(i).unwrap_or(i64::MAX).min(den), den)
+        };
+        let mix = |a: u8, b: u8| {
+            let (a, b) = (i64::from(a), i64::from(b));
+            u8::try_from(a + ((b - a) * at + den / 2).div_euclid(den)).unwrap_or(u8::MAX)
+        };
+        let rgb = (
+            mix(r.light.0, r.dark.0),
+            mix(r.light.1, r.dark.1),
+            mix(r.light.2, r.dark.2),
+        );
+        Some(to_color(rgb, self.truecolor))
+    }
 }
 
 pub fn resolve(id: ThemeId, truecolor: bool) -> Pal {
@@ -267,6 +318,8 @@ pub fn resolve(id: ThemeId, truecolor: bool) -> Pal {
         caution: c(d.caution),
         sel_bg: c(d.sel_bg),
         series: d.series.map(c),
+        model_ramp: d.model_ramp,
+        truecolor,
     }
 }
 

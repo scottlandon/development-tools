@@ -8,6 +8,7 @@
 mod chart;
 mod compact;
 pub mod fmt;
+mod models;
 pub mod theme;
 mod views;
 

@@ -3,6 +3,7 @@
 //! table and sidebar.
 
 use super::chart::{self, Bucket};
+use super::models;
 use super::theme::{pal, series};
 use super::{Tier, fmt, split_top};
 use crate::agg::Agg;
@@ -294,18 +295,36 @@ fn daily_main(f: &mut Frame, area: Rect, app: &mut App) {
     }
 }
 
+/// The colour of model `id` everywhere it is drawn.
+pub(super) fn model_colour(app: &App, id: u32) -> Color {
+    models::model_color(&app.ds, &app.summary.model_rank, id)
+}
+
+/// Every model in stack order: the ranked ones first, then any the current filter leaves out of the
+/// rank (live data can still carry them). Chart segments index into this.
+fn stack_order(app: &App) -> Vec<u32> {
+    let rank = &app.summary.model_rank;
+    let extra = (0..cast::to_u32(app.ds.models.len())).filter(|m| !rank.contains(m));
+    rank.iter().copied().chain(extra).collect()
+}
+
+/// Per-model chart colours in stack order, to pair with the segment indices the buckets use.
+pub(super) fn stack_colors(app: &App) -> Vec<Color> {
+    stack_order(app).into_iter().map(|m| model_colour(app, m)).collect()
+}
+
 /// Colour key for the top models, as many as fit in `room` cells.
 fn legend(app: &App, room: usize) -> Vec<Span<'static>> {
     let mut out = Vec::new();
     let mut used = 0usize;
-    for (pos, m) in app.summary.model_rank.iter().enumerate().take(8) {
+    for m in app.summary.model_rank.iter().take(8) {
         let label = &app.ds.models[*m as usize].short;
         let need = label.chars().count() + 3;
         if used + need > room {
             break;
         }
         used += need;
-        out.push(Span::styled("■ ", Style::default().fg(series(pos))));
+        out.push(Span::styled("■ ", Style::default().fg(model_colour(app, *m))));
         out.push(Span::styled(format!("{label}  "), Style::default().fg(pal().dim)));
     }
     out
@@ -350,7 +369,7 @@ fn daily_chart(f: &mut Frame, area: Rect, app: &App) {
         Metric::Cost => fmt::usd(v),
         Metric::Tokens => fmt::tok(cast::f64_to_u64(v)),
     };
-    chart::render(f.buffer_mut(), inner, &buckets, &axis, &pal().series);
+    chart::render(f.buffer_mut(), inner, &buckets, &axis, &stack_colors(app));
 }
 
 fn daily_table(f: &mut Frame, area: Rect, app: &mut App) {
@@ -445,8 +464,7 @@ fn breakdown_items(app: &App, items: &[(u32, Agg)], projects: bool, limit: usize
     items
         .iter()
         .take(limit)
-        .enumerate()
-        .map(|(pos, (id, a))| {
+        .map(|(id, a)| {
             let v = value(metric, a);
             BarItem {
                 label: if projects {
@@ -459,11 +477,7 @@ fn breakdown_items(app: &App, items: &[(u32, Agg)], projects: bool, limit: usize
                     Metric::Cost => fmt::usd(a.cost),
                     Metric::Tokens => fmt::tok(a.total()),
                 },
-                color: if projects {
-                    pal().accent
-                } else {
-                    series(app.summary.model_rank.iter().position(|m| m == id).unwrap_or(pos))
-                },
+                color: if projects { pal().accent } else { model_colour(app, *id) },
             }
         })
         .collect()
@@ -584,8 +598,10 @@ pub fn breakdown(f: &mut Frame, area: Rect, app: &mut App, tier: Tier) {
         };
         let mut spans = Vec::new();
         if !projects {
-            let pos = rank.iter().position(|m| m == id).unwrap_or(0);
-            spans.push(Span::styled("■ ", Style::default().fg(series(pos))));
+            spans.push(Span::styled(
+                "■ ",
+                Style::default().fg(models::model_color(&ds, rank, *id)),
+            ));
         }
         let name_style = if is_active {
             Style::default().fg(pal().caution).add_modifier(Modifier::BOLD)
@@ -691,7 +707,7 @@ pub fn sessions(f: &mut Frame, area: Rect, app: &mut App) {
 /// Per-minute rate buckets for the Live charts, stacked by model.
 pub(super) fn live_buckets(app: &App, pick: &dyn Fn(&Agg) -> u64) -> Vec<Bucket> {
     let lv = &app.live;
-    let rank = &app.summary.model_rank;
+    let order = stack_order(app);
     let per_min = 60.0 / lv.step.max(1) as f64;
     lv.buckets
         .iter()
@@ -699,12 +715,7 @@ pub(super) fn live_buckets(app: &App, pick: &dyn Fn(&Agg) -> u64) -> Vec<Bucket>
             let mut segs: Vec<(usize, f64)> = b
                 .models
                 .iter()
-                .map(|(m, a)| {
-                    (
-                        rank.iter().position(|r| r == m).unwrap_or(*m as usize),
-                        pick(a) as f64 * per_min,
-                    )
-                })
+                .map(|(m, a)| (order.iter().position(|r| r == m).unwrap_or(0), pick(a) as f64 * per_min))
                 .collect();
             segs.sort_by_key(|s| s.0);
             Bucket {
@@ -747,7 +758,7 @@ fn live_chart(f: &mut Frame, area: Rect, app: &App, name: &str, pick: &dyn Fn(&A
         inner,
         &buckets,
         &|v| fmt::tok(cast::f64_to_u64(v)),
-        &pal().series,
+        &stack_colors(app),
     );
 }
 

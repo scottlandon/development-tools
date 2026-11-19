@@ -53,7 +53,7 @@ fn render_live(f: &mut Frame, area: Rect, app: &App) {
             rest,
             &buckets,
             &|v| fmt::tok(cast::f64_to_u64(v)),
-            &pal().series,
+            &views::stack_colors(app),
         );
     } else if rest.height >= 1 {
         let vals: Vec<u64> = lv.buckets.iter().map(|b| b.agg.total()).collect();
@@ -137,9 +137,9 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
 
     // Spare height after the days (e.g. the "today" range): top models.
     let spare = rows.saturating_sub(show_days);
-    for (pos, (id, a)) in app.models_sorted.iter().enumerate().take(spare) {
+    for (id, a) in app.models_sorted.iter().take(spare) {
         let name = &app.ds.models[*id as usize].short;
-        let color = series(app.summary.model_rank.iter().position(|r| r == id).unwrap_or(pos));
+        let color = views::model_colour(app, *id);
         let txt = val(m, a.cost, a.total());
         let name_w = w.saturating_sub(vw + 5).max(4);
         lines.push(Line::from(vec![

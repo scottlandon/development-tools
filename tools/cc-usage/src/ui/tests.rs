@@ -430,17 +430,21 @@ fn indexed_mode_never_emits_rgb() {
     }
 }
 
-#[test]
-fn chart_bars_use_the_themes_series_colours() {
-    let mut app = themed(ThemeId::Mainframe, true);
-    let buf = render_buf(&mut app, 120, 34);
-    let p = theme::resolve(ThemeId::Mainframe, true);
-    let seen: std::collections::HashSet<_> = buf
-        .content
+fn bar_colours(buf: &Buffer) -> std::collections::HashSet<Color> {
+    buf.content
         .iter()
         .filter(|c| "▁▂▃▄▅▆▇█".contains(c.symbol()))
         .map(|c| c.fg)
-        .collect();
+        .collect()
+}
+
+#[test]
+fn chart_bars_use_the_themes_series_colours() {
+    // Amber colours models by usage rank, straight from the theme's series.
+    let mut app = themed(ThemeId::Amber, true);
+    let buf = render_buf(&mut app, 120, 34);
+    let p = theme::resolve(ThemeId::Amber, true);
+    let seen = bar_colours(&buf);
     assert!(
         seen.contains(&p.series[0]),
         "top model uses the first series colour: {seen:?}"
@@ -450,6 +454,47 @@ fn chart_bars_use_the_themes_series_colours() {
         seen.iter().all(|c| p.series.contains(c)),
         "only theme colours in bars: {seen:?}"
     );
+}
+
+#[test]
+fn mainframe_chart_bars_use_each_models_tier_colour() {
+    let mut app = themed(ThemeId::Mainframe, true);
+    let buf = render_buf(&mut app, 120, 34);
+    let by_name = |app: &App, n: &str| {
+        let id = app.ds.models.iter().position(|m| m.name == n).unwrap();
+        views::model_colour(app, cast::to_u32(id))
+    };
+    let seen = bar_colours(&buf);
+    let (haiku, opus) = (by_name(&app, "claude-haiku-5-5"), by_name(&app, "claude-opus-5-5"));
+    assert_ne!(haiku, opus);
+    assert_eq!(opus, Color::Rgb(0xFF, 0x5C, 0x5C), "darkest tiered model is the red");
+    let want: std::collections::HashSet<Color> = app
+        .ds
+        .models
+        .iter()
+        .enumerate()
+        .map(|(i, _)| views::model_colour(&app, cast::to_u32(i)))
+        .collect();
+    assert!(seen.contains(&haiku) && seen.contains(&opus), "{seen:?}");
+    assert!(seen.is_subset(&want), "only model colours in bars: {seen:?}");
+
+    // Narrowing the window or the project reshuffles the usage rank but not anyone's colour.
+    let before: Vec<Color> = (0..4).map(|i| views::model_colour(&app, i)).collect();
+    let base_rank = app.summary.model_rank.clone();
+    let mut reshuffled = false;
+    for range in [Range::Today, Range::Week] {
+        for project in [None, Some(0), Some(1), Some(2)] {
+            app.range = range;
+            app.project_filter = project;
+            app.recompute();
+            reshuffled |= app.summary.model_rank != base_rank;
+            let after: Vec<Color> = (0..4).map(|i| views::model_colour(&app, i)).collect();
+            assert_eq!(before, after, "{range:?} {project:?}");
+            let seen = bar_colours(&render_buf(&mut app, 120, 34));
+            assert!(seen.is_subset(&want), "{seen:?}");
+        }
+    }
+    assert!(reshuffled, "some filter changed the rank");
 }
 
 #[test]
