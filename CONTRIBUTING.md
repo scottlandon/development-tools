@@ -72,6 +72,10 @@ Filesystem access belongs in `scan.rs` and nowhere else.
 Never put real transcripts, project names, or usage figures in issues, PRs, tests, or screenshots.
 `cc-usage --demo` runs on synthetic data; the screenshots in `tools/cc-usage/docs/` are captures of it.
 
+The screenshots are scripted with [vhs](https://github.com/charmbracelet/vhs) (`brew install vhs`, which also
+installs ttyd and ffmpeg). Whenever the UI or colours change, regenerate them with `scripts/screenshots.sh` and
+commit the new PNGs; the tapes live in `tools/cc-usage/docs/tapes/`, one per image. Keep them on `--demo` data only.
+
 ## Updating prices
 
 `cc-usage` ships a built-in price table (`tools/cc-usage/src/pricing.rs`). When Anthropic changes

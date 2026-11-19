@@ -180,6 +180,8 @@ switch 15 min / 1 h / 6 h / 24 h. It redraws every second, with a `● live` / `
 | Catppuccin | Amber |
 |---|---|
 | ![Models view in Catppuccin Mocha](docs/catppuccin.png) | ![Projects view in Amber](docs/amber.png) |
+| **Daylight** | |
+| ![Daily view in Daylight, the light theme](docs/daylight.png) | |
 
 Every theme paints its own background. Colours are 24-bit when `$COLORTERM` says truecolor, otherwise mapped to
 the nearest xterm-256 colour (force either with `--color truecolor|256`). Tests hold every theme to contrast floors.
