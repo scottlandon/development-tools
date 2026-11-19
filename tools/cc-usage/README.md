@@ -161,10 +161,10 @@ sandbox-exec -f /tmp/readonly.sb cc-usage --print --days 3
 
 `1` Daily (stacked chart by model + table) · `2` Models · `3` Projects · `4` Sessions · `5` Live.
 
-Keys: `Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` (or `Ctrl-d` `Ctrl-u`) page, `g` `G`
+Keys: `Tab` `Shift-Tab`/`←` `→`/`h` `l` switch view · `↑` `↓`/`j` `k` move · `PgUp` `PgDn` (or `Ctrl-d` `Ctrl-u`) page, `g` `G`
 (or `Home` `End`) first / last · `t` / `T` change time range · `c` cost ⇄ tokens · `m` / `p` cycle model / project
 filter · `Enter` filter by the selected model or project · `Esc` clear filters · `s` sort sessions · `a` / `A` theme ·
-`r` rescan · `?` help · `q` quit.
+`r` rescan · `?`/`F1` help · `q` quit.
 A filter stays on the same model or project across rescans.
 
 **Live** shows tokens per minute (stacked by model) and output tokens per minute over a sliding window; `t` / `T`

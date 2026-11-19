@@ -377,24 +377,29 @@ fn render_footer(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
+/// `(keys, description)` rows of the `?` overlay; every key `App::on_key` handles must appear here.
+const HELP_ROWS: [(&str, &str); 15] = [
+    ("Tab / Shift-Tab", "next / previous view (also ← →  h l)"),
+    ("1-5", "jump to Daily/Models/Projects/Sessions/Live"),
+    ("↑ ↓  j k", "move selection"),
+    ("PgUp PgDn", "move 10 rows (also Ctrl-d / Ctrl-u)"),
+    ("Home End  g G", "jump to first / last row"),
+    ("t / T", "cycle time range (Live: window) fwd / back"),
+    ("c", "toggle cost ⇄ tokens (chart, sort)"),
+    ("m / p", "cycle model / project filter"),
+    ("Enter", "filter by selected model/project"),
+    ("Esc", "clear filters"),
+    ("a / A", "next / previous colour theme"),
+    ("s", "sort sessions"),
+    ("r", "rescan now"),
+    ("? / F1", "show this help"),
+    ("q  Ctrl-C", "quit"),
+];
+
 fn help(f: &mut Frame, area: Rect) {
-    let rows = [
-        ("Tab / ← →  h l", "switch view"),
-        ("1-5", "jump to Daily/Models/Projects/Sessions/Live"),
-        ("↑ ↓  j k", "move selection"),
-        ("PgUp PgDn  g G", "page / first / last"),
-        ("t / T", "cycle time range (Live: window) fwd / back"),
-        ("c", "toggle cost ⇄ tokens (chart, sort)"),
-        ("m / p", "cycle model / project filter"),
-        ("Enter", "filter by selected model/project"),
-        ("Esc", "clear filters"),
-        ("a / A", "next / previous colour theme"),
-        ("s", "sort sessions"),
-        ("r", "rescan now"),
-        ("q  Ctrl-C", "quit"),
-    ];
+    let rows = HELP_ROWS;
     let h = (cast::to_u16(rows.len()) + 4).min(area.height);
-    let w = 62u16.min(area.width);
+    let w = 64u16.min(area.width);
     let r = Rect::new(area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h);
     f.render_widget(Clear, r);
     f.render_widget(Block::default().style(fill_style()), r);
@@ -402,7 +407,7 @@ fn help(f: &mut Frame, area: Rect) {
     for (k, d) in rows {
         lines.push(Line::from(vec![
             Span::styled(
-                format!(" {k:<16}"),
+                format!(" {k:<17}"),
                 Style::default().fg(pal().accent).add_modifier(Modifier::BOLD),
             ),
             Span::raw(d),

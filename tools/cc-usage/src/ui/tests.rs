@@ -417,6 +417,35 @@ fn themed_help_overlay_keeps_the_ground() {
 }
 
 #[test]
+fn help_overlay_documents_every_handled_key() {
+    let tokens: Vec<&str> = HELP_ROWS
+        .iter()
+        .flat_map(|(k, d)| k.split_whitespace().chain(d.split_whitespace()))
+        .map(|t| t.trim_matches(|c| c == '(' || c == ')'))
+        .collect();
+    for key in [
+        "Ctrl-d",
+        "Ctrl-u",
+        "Home",
+        "End",
+        "g",
+        "G",
+        "F1",
+        "Shift-Tab",
+        "Tab",
+        "?",
+    ] {
+        assert!(tokens.contains(&key), "help overlay is missing {key}");
+    }
+    let mut app = app_with(3, Range::Month);
+    app.show_help = true;
+    let frame = render(&mut app, 100, 30);
+    for key in ["Ctrl-d / Ctrl-u", "Home End", "? / F1", "Tab / Shift-Tab"] {
+        assert!(frame.contains(key), "rendered overlay is missing {key}");
+    }
+}
+
+#[test]
 fn indexed_mode_never_emits_rgb() {
     for id in ThemeId::ALL {
         let mut app = themed(id, false);

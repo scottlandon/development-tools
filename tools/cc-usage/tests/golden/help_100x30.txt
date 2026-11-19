@@ -3,25 +3,25 @@
 ╭ Tokens ───────────────╮╭ Est. cost ────────────╮╭ Cache hit ────────────╮╭ Activity ─────────────╮
 │117M                   ││$22.87  +44 unpriced   ││96%  112M read         ││180 msgs  17 sessions  │
 ╰───────────────────────╯╰───────────────────────╯╰───────────────────────╯╰───────────────────────╯
-╭ Est. cost per day ───────────────────────■ opus-5-5  ■ sonnet-5-5  ■ haiku-5-5  ■ mystery-model  ╮
-│$0.99 ▂▂ ██       ╭ Keys ──────────────────────────────────────────────────────╮  ▅▅          ▅▅▅ │
-│      ██ ██ ▁▁    │                                                            │▇ ██       ▇▇ ███ │
-│      ██ ██ ██ ▄▄ │ Tab / ← →  h l  switch view                                │█ ██ ▇▇ ▂▂ ██ ███ │
-│$0.50 ██ ██ ██ ██ │ 1-5             jump to Daily/Models/Projects/Sessions/Live│█ ██ ██ ██ ██ ███ │
-│      ██ ██ ██ ██ │ ↑ ↓  j k        move selection                             │█ ██ ██ ██ ██ ███ │
-│    0 ██ ██ ██ ██ │ PgUp PgDn  g G  page / first / last                        │█ ██ ██ ██ ██ ███ │
-│      10-10 10-12 │ t / T           cycle time range (Live: window) fwd / back │1-03 11-05 11-07  │
-╰──────────────────│ c               toggle cost ⇄ tokens (chart, sort)         │──────────────────╯
-╭ Daily · 30 days ─│ m / p           cycle model / project filter               │──────────── 1/30 ╮
-│            Input │ Enter           filter by selected model/project           │                  │
-│Sat 11-08   1.35K │ Esc             clear filters                              │                  │
-│Fri 11-07   1.35K │ a / A           next / previous colour theme               │                  │
-│Thu 11-06   1.35K │ s               sort sessions                              │                  │
-│Wed 11-05   1.35K │ r               rescan now                                 │                  │
-│Tue 11-04   1.35K │ q  Ctrl-C       quit                                       │                  │
-│Mon 11-03   1.35K │                                                            │                  │
-│Sun 11-02   1.35K ╰ prices checked 2026-11-18 ─────────────── any key to close ╯                  │
-│Sat 11-01   1.35K   16.6K    135K   3.75M   3.90M    $0.64      6 █████▏                          │
+╭ Est. cost per da╭ Keys ────────────────────────────────────────────────────────╮■ mystery-model  ╮
+│$0.99 ▂▂ ██      │                                                              │ ▅▅          ▅▅▅ │
+│      ██ ██ ▁▁   │ Tab / Shift-Tab  next / previous view (also ← →  h l)        │ ██       ▇▇ ███ │
+│      ██ ██ ██ ▄▄│ 1-5              jump to Daily/Models/Projects/Sessions/Live │ ██ ▇▇ ▂▂ ██ ███ │
+│$0.50 ██ ██ ██ ██│ ↑ ↓  j k         move selection                              │ ██ ██ ██ ██ ███ │
+│      ██ ██ ██ ██│ PgUp PgDn        move 10 rows (also Ctrl-d / Ctrl-u)         │ ██ ██ ██ ██ ███ │
+│    0 ██ ██ ██ ██│ Home End  g G    jump to first / last row                    │ ██ ██ ██ ██ ███ │
+│      10-10 10-12│ t / T            cycle time range (Live: window) fwd / back  │-03 11-05 11-07  │
+╰─────────────────│ c                toggle cost ⇄ tokens (chart, sort)          │─────────────────╯
+╭ Daily · 30 days │ m / p            cycle model / project filter                │─────────── 1/30 ╮
+│            Input│ Enter            filter by selected model/project            │                 │
+│Sat 11-08   1.35K│ Esc              clear filters                               │                 │
+│Fri 11-07   1.35K│ a / A            next / previous colour theme                │                 │
+│Thu 11-06   1.35K│ s                sort sessions                               │                 │
+│Wed 11-05   1.35K│ r                rescan now                                  │                 │
+│Tue 11-04   1.35K│ ? / F1           show this help                              │                 │
+│Mon 11-03   1.35K│ q  Ctrl-C        quit                                        │                 │
+│Sun 11-02   1.35K│                                                              │                 │
+│Sat 11-01   1.35K╰ prices checked 2026-11-18 ───────────────── any key to close ╯                 │
 │Fri 10-31   1.35K   16.8K    135K   3.75M   3.90M    $0.95      6 ███████▋                        │
 │Thu 10-30   1.35K   17.0K    135K   3.75M   3.90M    $0.83      6 ██████▋                         │
 │Wed 10-29   1.35K   17.2K    135K   3.75M   3.90M    $0.55      6 ████▍                           │
