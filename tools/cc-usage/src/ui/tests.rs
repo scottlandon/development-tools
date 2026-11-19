@@ -439,22 +439,21 @@ fn bar_colours(buf: &Buffer) -> std::collections::HashSet<Color> {
 }
 
 #[test]
-fn chart_bars_use_the_themes_series_colours() {
-    // Daylight colours models by usage rank, straight from the theme's series.
+fn daylight_chart_bars_use_each_models_family_colour() {
     let mut app = themed(ThemeId::Daylight, true);
     let buf = render_buf(&mut app, 120, 34);
     let p = theme::resolve(ThemeId::Daylight, true);
     let seen = bar_colours(&buf);
-    assert!(
-        seen.contains(&p.series[0]),
-        "top model uses the first series colour: {seen:?}"
-    );
+    let want: std::collections::HashSet<Color> = (0..app.ds.models.len())
+        .map(|i| views::model_colour(&app, cast::to_u32(i)))
+        .collect();
     assert!(seen.len() >= 2, "stacked by model: {seen:?}");
     assert!(
-        // Daylight's accent is not a series slot, and accent-coloured glyphs elsewhere also match.
-        seen.iter().all(|c| p.series.contains(c) || *c == p.accent),
-        "only theme colours in bars: {seen:?}"
+        // Project bars take the accent; accent-coloured glyphs elsewhere also match.
+        seen.iter().all(|c| want.contains(c) || *c == p.accent),
+        "only model colours and the accent in bars: {seen:?}"
     );
+    assert!(seen.iter().any(|c| want.contains(c)), "model colours in bars: {seen:?}");
 }
 
 #[test]

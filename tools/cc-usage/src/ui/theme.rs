@@ -99,8 +99,8 @@ struct Def {
     sel_bg: Rgb,
     /// Chart / legend series, in rank order.
     series: [Rgb; 8],
-    /// When set, models are coloured by family from these hues instead of by rank.
-    model_hues: Option<FamilyHues>,
+    /// Models are coloured by family from these hues.
+    model_hues: FamilyHues,
 }
 
 /// One hue per model family, taken from the theme's own palette (see `ui::models`).
@@ -141,13 +141,13 @@ fn def(id: ThemeId) -> Def {
             ],
             // Phosphor: one green per family, pale Haiku to deep Fable, so weight reads as depth. Models
             // of any other family take white, orange and grey, none of them green.
-            model_hues: Some(FamilyHues {
+            model_hues: FamilyHues {
                 haiku: hex(0xC8_FF_D9),
                 sonnet: hex(0x7D_FF_A6),
                 opus: hex(0x33_FF_77),
                 fable: hex(0x1F_B5_52),
                 other: &[1, 4, 2],
-            }),
+            },
         },
         // Amber: the P3 amber tube. Warm black ground, text in the phosphor's own tone.
         ThemeId::Amber => Def {
@@ -172,13 +172,13 @@ fn def(id: ThemeId) -> Def {
             ],
             // Amber to ember: one shade per family, yellow-amber Haiku to burnt-orange Fable, so weight reads
             // as heat. Models of any other family take sky, green, violet and pink, none of them amber.
-            model_hues: Some(FamilyHues {
+            model_hues: FamilyHues {
                 haiku: hex(0xFF_E0_66),
                 sonnet: hex(0xFF_C2_33),
                 opus: hex(0xFF_9A_1F),
                 fable: hex(0xE0_66_1A),
                 other: &[6, 3, 5, 4],
-            }),
+            },
         },
         ThemeId::Daylight => daylight(),
         // Catppuccin Mocha: mauve accent on the "base" ground. Secondary text is overlay2 rather than the
@@ -207,13 +207,13 @@ fn def(id: ThemeId) -> Def {
             // depth around the accent. Sonnet and Opus are the official Mocha lavender and mauve, with a
             // lighter and a deeper step derived. Models of any other family take green, peach, teal and
             // yellow, none of them purple.
-            model_hues: Some(FamilyHues {
+            model_hues: FamilyHues {
                 haiku: hex(0xD9_DE_FE),
                 sonnet: hex(0xB4_BE_FE),
                 opus: hex(0xCB_A6_F7),
                 fable: hex(0xA4_7F_D6),
                 other: &[1, 2, 6, 5],
-            }),
+            },
         },
     }
 }
@@ -242,7 +242,16 @@ fn daylight() -> Def {
             hex(0xEA_58_0C),
             hex(0x64_74_8B),
         ],
-        model_hues: None,
+        // Ink: slate greys darkening Haiku to Opus, with Fable in the teal accent so the top family stands
+        // out from the greys. Models of any other family take blue, violet, pink and orange, none of them
+        // grey or teal.
+        model_hues: FamilyHues {
+            haiku: hex(0x64_74_8B),
+            sonnet: hex(0x47_55_69),
+            opus: hex(0x33_41_55),
+            fable: hex(0x0F_72_6B),
+            other: &[1, 2, 4, 6],
+        },
     }
 }
 
@@ -259,7 +268,7 @@ pub struct Pal {
     pub caution: Color,
     pub sel_bg: Color,
     pub series: [Color; 8],
-    pub model_hues: Option<FamilyHues>,
+    pub model_hues: FamilyHues,
     bg_rgb: Rgb,
     truecolor: bool,
 }
@@ -268,11 +277,10 @@ impl Pal {
     /// The colour of a model of `tier` (0 Haiku, 1 Sonnet, 2 Opus, 3 Fable or Mythos) with `back`
     /// newer versions in its family out of `of` in all. The newest is the family hue itself; each
     /// older one is blended 30% further toward the ground, with the total capped where the colour
-    /// would fall under 3:1 against it, so the versions stay legible and distinct. `None` when the
-    /// theme colours models by rank. Resolved like every other colour, so 256-colour terminals get
+    /// would fall under 3:1 against it, so the versions stay legible and distinct. Resolved like every other colour, so 256-colour terminals get
     /// the nearest xterm index.
-    pub fn family_shade(&self, tier: u8, back: usize, of: usize) -> Option<Color> {
-        let h = self.model_hues?;
+    pub fn family_shade(&self, tier: u8, back: usize, of: usize) -> Color {
+        let h = self.model_hues;
         let hue = match tier {
             0 => h.haiku,
             1 => h.sonnet,
@@ -303,7 +311,7 @@ impl Pal {
             0
         };
         let pm = step.saturating_mul(i32::try_from(back).unwrap_or(i32::MAX));
-        Some(to_color(blend(pm), self.truecolor))
+        to_color(blend(pm), self.truecolor)
     }
 }
 

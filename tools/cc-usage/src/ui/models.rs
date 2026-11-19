@@ -1,7 +1,6 @@
-//! Per-model colours. Most themes colour models by usage rank (`theme::series`); a theme with family
-//! hues (Mainframe, Amber, Catppuccin) gives each family its own colour instead, the newest version in the
-//! dataset the hue itself and older ones progressively dimmer, so a model keeps its colour whatever
-//! the filter or time window does to its rank.
+//! Per-model colours. Every theme gives each model family its own colour (`FamilyHues`), the newest
+//! version in the dataset the hue itself and older ones progressively dimmer, so a model keeps its
+//! colour whatever the filter or time window does to its rank.
 
 use super::theme::{pal, series};
 use crate::data::Dataset;
@@ -50,13 +49,11 @@ fn version(toks: &[&str]) -> Option<(u32, u32)> {
 
 /// The colour of model `id` (an index into `ds.models`); `rank` is the current usage rank.
 pub fn model_color(ds: &Dataset, rank: &[u32], id: u32) -> Color {
-    let by_rank = || series(rank.iter().position(|r| *r == id).unwrap_or(id as usize));
     let p = pal();
-    let Some(hues) = p.model_hues else {
-        return by_rank();
-    };
+    let hues = p.model_hues;
     let Some(me) = ds.models.get(id as usize).map(|m| m.name.as_str()) else {
-        return by_rank();
+        // Not a model in the dataset: fall back to the usage rank.
+        return series(rank.iter().position(|r| *r == id).unwrap_or(id as usize));
     };
     let key = |name: &str| tier_version(name).map(|tv| (tv, name.to_owned()));
     let names = || ds.models.iter().map(|m| m.name.as_str());
@@ -64,7 +61,7 @@ pub fn model_color(ds: &Dataset, rank: &[u32], id: u32) -> Color {
         // Position among every model of the family in the dataset, so it never depends on the filter.
         let family: Vec<_> = names().filter_map(key).filter(|k| k.0.0 == tier).collect();
         let newer = family.iter().filter(|k| **k > mine).count();
-        p.family_shade(tier, newer, family.len()).unwrap_or_else(by_rank)
+        p.family_shade(tier, newer, family.len())
     } else {
         let nth = names().filter(|n| tier_version(n).is_none() && *n < me).count();
         series(hues.other[nth % hues.other.len()])
@@ -152,7 +149,10 @@ mod tests {
         assert_eq!(col(3), rgb(opus));
         assert_eq!(col(0), rgb(fable), "newest fable is the family hue");
         let old = col(2);
-        assert!(lum(old) < lum(rgb(fable)), "older fable is dimmer: {old:?}");
+        assert!(
+            contrast(old, bg) < contrast(rgb(fable), bg),
+            "older fable is dimmer, nearer the ground: {old:?}"
+        );
         assert!(contrast(old, bg) >= 3.0, "{old:?} reads on the ground");
         let (Color::Rgb(r, g, b), Color::Rgb(fr, fg, fb)) = (old, rgb(fable)) else {
             panic!("not truecolor")
@@ -213,6 +213,26 @@ mod tests {
     }
 
     #[test]
+    fn daylight_colours_models_in_ink() {
+        let fam = [0x64_74_8B, 0x47_55_69, 0x33_41_55, 0x0F_72_6B];
+        let bg = Color::Rgb(0xF3, 0xF0, 0xEA);
+        check_families(ThemeId::Daylight, bg, fam);
+        // Slate greys darken strictly from Haiku to Opus; Fable is a lighter teal, deliberately outside that ramp.
+        assert!(fam[..3].windows(2).all(|w| lum(rgb(w[0])) > lum(rgb(w[1]))), "{fam:x?}");
+        for f in fam {
+            assert!(contrast(rgb(f), bg) >= 3.0, "{f:x} reads on the paper");
+        }
+        let d = ds(&FIVE);
+        let rank: Vec<u32> = (0..5).collect();
+        let old = model_color(&d, &rank, 2);
+        assert_ne!(old, rgb(fam[3]), "older fable is dimmed");
+        assert!(contrast(old, bg) >= 3.0, "{old:?}");
+        for i in [0, 1, 3, 4] {
+            assert_ne!(old, model_color(&d, &rank, i), "older fable vs model {i}");
+        }
+    }
+
+    #[test]
     fn dimming_steps_back_one_version_at_a_time() {
         set_current(resolve(ThemeId::Mainframe, true));
         let d = ds(&["claude-opus-4", "claude-opus-4-1", "claude-opus-4-5", "claude-opus-5-1"]);
@@ -250,10 +270,11 @@ mod tests {
 
     #[test]
     fn unknown_families_take_the_other_slots() {
-        let themes: [(_, &[usize]); 3] = [
+        let themes: [(_, &[usize]); 4] = [
             (ThemeId::Mainframe, &[1, 4, 2]),
             (ThemeId::Amber, &[6, 3, 5, 4]),
             (ThemeId::Catppuccin, &[1, 2, 6, 5]),
+            (ThemeId::Daylight, &[1, 2, 4, 6]),
         ];
         for (id, other) in themes {
             let p = resolve(id, true);
@@ -279,17 +300,8 @@ mod tests {
     }
 
     #[test]
-    fn daylight_colours_by_rank() {
-        let p = resolve(ThemeId::Daylight, true);
-        set_current(p);
-        let d = ds(&["claude-haiku-5-5", "claude-opus-5-5"]);
-        assert_eq!(model_color(&d, &[1, 0], 1), p.series[0]);
-        assert_eq!(model_color(&d, &[1, 0], 0), p.series[1]);
-    }
-
-    #[test]
     fn families_resolve_to_xterm_indices_without_truecolor() {
-        for id in [ThemeId::Mainframe, ThemeId::Amber, ThemeId::Catppuccin] {
+        for id in ThemeId::ALL {
             set_current(resolve(id, false));
             let d = ds(&["claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2", "mystery"]);
             for i in 0..4 {
