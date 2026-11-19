@@ -440,10 +440,10 @@ fn bar_colours(buf: &Buffer) -> std::collections::HashSet<Color> {
 
 #[test]
 fn chart_bars_use_the_themes_series_colours() {
-    // Catppuccin colours models by usage rank, straight from the theme's series.
-    let mut app = themed(ThemeId::Catppuccin, true);
+    // Daylight colours models by usage rank, straight from the theme's series.
+    let mut app = themed(ThemeId::Daylight, true);
     let buf = render_buf(&mut app, 120, 34);
-    let p = theme::resolve(ThemeId::Catppuccin, true);
+    let p = theme::resolve(ThemeId::Daylight, true);
     let seen = bar_colours(&buf);
     assert!(
         seen.contains(&p.series[0]),
@@ -451,7 +451,8 @@ fn chart_bars_use_the_themes_series_colours() {
     );
     assert!(seen.len() >= 2, "stacked by model: {seen:?}");
     assert!(
-        seen.iter().all(|c| p.series.contains(c)),
+        // Daylight's accent is not a series slot, and accent-coloured glyphs elsewhere also match.
+        seen.iter().all(|c| p.series.contains(c) || *c == p.accent),
         "only theme colours in bars: {seen:?}"
     );
 }

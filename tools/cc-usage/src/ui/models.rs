@@ -1,5 +1,5 @@
 //! Per-model colours. Most themes colour models by usage rank (`theme::series`); a theme with family
-//! hues (Mainframe, Amber) gives each family its own colour instead, the newest version in the
+//! hues (Mainframe, Amber, Catppuccin) gives each family its own colour instead, the newest version in the
 //! dataset the hue itself and older ones progressively dimmer, so a model keeps its colour whatever
 //! the filter or time window does to its rank.
 
@@ -197,6 +197,22 @@ mod tests {
     }
 
     #[test]
+    fn catppuccin_colours_models_by_family() {
+        let fam = [0xD9_DE_FE, 0xB4_BE_FE, 0xCB_A6_F7, 0xA4_7F_D6];
+        let bg = Color::Rgb(0x1E, 0x1E, 0x2E);
+        check_families(ThemeId::Catppuccin, bg, fam);
+        // All lavender to mauve, so depth is the cue: strictly darker from Haiku up to Fable.
+        assert!(fam.windows(2).all(|w| lum(rgb(w[0])) > lum(rgb(w[1]))), "{fam:x?}");
+        let d = ds(&FIVE);
+        let rank: Vec<u32> = (0..5).collect();
+        let old = model_color(&d, &rank, 2);
+        assert!(contrast(old, bg) >= 3.0, "{old:?}");
+        for i in [0, 1, 3, 4] {
+            assert_ne!(old, model_color(&d, &rank, i), "older fable vs model {i}");
+        }
+    }
+
+    #[test]
     fn dimming_steps_back_one_version_at_a_time() {
         set_current(resolve(ThemeId::Mainframe, true));
         let d = ds(&["claude-opus-4", "claude-opus-4-1", "claude-opus-4-5", "claude-opus-5-1"]);
@@ -234,7 +250,11 @@ mod tests {
 
     #[test]
     fn unknown_families_take_the_other_slots() {
-        let themes: [(_, &[usize]); 2] = [(ThemeId::Mainframe, &[1, 4, 2]), (ThemeId::Amber, &[6, 3, 5, 4])];
+        let themes: [(_, &[usize]); 3] = [
+            (ThemeId::Mainframe, &[1, 4, 2]),
+            (ThemeId::Amber, &[6, 3, 5, 4]),
+            (ThemeId::Catppuccin, &[1, 2, 6, 5]),
+        ];
         for (id, other) in themes {
             let p = resolve(id, true);
             set_current(p);
@@ -259,19 +279,17 @@ mod tests {
     }
 
     #[test]
-    fn catppuccin_and_daylight_colour_by_rank() {
-        for id in [ThemeId::Catppuccin, ThemeId::Daylight] {
-            let p = resolve(id, true);
-            set_current(p);
-            let d = ds(&["claude-haiku-5-5", "claude-opus-5-5"]);
-            assert_eq!(model_color(&d, &[1, 0], 1), p.series[0]);
-            assert_eq!(model_color(&d, &[1, 0], 0), p.series[1]);
-        }
+    fn daylight_colours_by_rank() {
+        let p = resolve(ThemeId::Daylight, true);
+        set_current(p);
+        let d = ds(&["claude-haiku-5-5", "claude-opus-5-5"]);
+        assert_eq!(model_color(&d, &[1, 0], 1), p.series[0]);
+        assert_eq!(model_color(&d, &[1, 0], 0), p.series[1]);
     }
 
     #[test]
     fn families_resolve_to_xterm_indices_without_truecolor() {
-        for id in [ThemeId::Mainframe, ThemeId::Amber] {
+        for id in [ThemeId::Mainframe, ThemeId::Amber, ThemeId::Catppuccin] {
             set_current(resolve(id, false));
             let d = ds(&["claude-haiku-5-5", "claude-fable-5-1", "claude-fable-5-2", "mystery"]);
             for i in 0..4 {

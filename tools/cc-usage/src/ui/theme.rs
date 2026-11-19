@@ -203,7 +203,17 @@ fn def(id: ThemeId) -> Def {
                 hex(0x94_E2_D5), // teal
                 hex(0xF3_8B_A8), // red
             ],
-            model_hues: None,
+            // Lavender to mauve: one shade per family, pale Haiku to deep-mauve Fable, so weight reads as
+            // depth around the accent. Sonnet and Opus are the official Mocha lavender and mauve, with a
+            // lighter and a deeper step derived. Models of any other family take green, peach, teal and
+            // yellow, none of them purple.
+            model_hues: Some(FamilyHues {
+                haiku: hex(0xD9_DE_FE),
+                sonnet: hex(0xB4_BE_FE),
+                opus: hex(0xCB_A6_F7),
+                fable: hex(0xA4_7F_D6),
+                other: &[1, 2, 6, 5],
+            }),
         },
     }
 }
