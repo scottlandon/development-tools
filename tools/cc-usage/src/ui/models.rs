@@ -182,10 +182,10 @@ mod tests {
 
     #[test]
     fn amber_colours_models_by_family() {
-        let fam = [0xFF_E4_B0, 0xFF_CB_6B, 0xFF_B0_00, 0xC9_8A_00];
+        let fam = [0xFF_E0_66, 0xFF_C2_33, 0xFF_9A_1F, 0xE0_66_1A];
         let bg = Color::Rgb(0x15, 0x0F, 0x08);
         check_families(ThemeId::Amber, bg, fam);
-        // All amber, so depth is the cue: strictly darker from Haiku up to Fable.
+        // All amber to ember, so heat is the cue: strictly darker from Haiku up to Fable.
         assert!(fam.windows(2).all(|w| lum(rgb(w[0])) > lum(rgb(w[1]))), "{fam:x?}");
         let d = ds(&FIVE);
         let rank: Vec<u32> = (0..5).collect();

@@ -170,13 +170,13 @@ fn def(id: ThemeId) -> Def {
                 hex(0x7F_D3_FF),
                 hex(0x9C_8B_76),
             ],
-            // Amber phosphor: one amber per family, pale Haiku to deep Fable, so weight reads as depth.
-            // Models of any other family take sky, green, violet and pink, none of them amber.
+            // Amber to ember: one shade per family, yellow-amber Haiku to burnt-orange Fable, so weight reads
+            // as heat. Models of any other family take sky, green, violet and pink, none of them amber.
             model_hues: Some(FamilyHues {
-                haiku: hex(0xFF_E4_B0),
-                sonnet: hex(0xFF_CB_6B),
-                opus: hex(0xFF_B0_00),
-                fable: hex(0xC9_8A_00),
+                haiku: hex(0xFF_E0_66),
+                sonnet: hex(0xFF_C2_33),
+                opus: hex(0xFF_9A_1F),
+                fable: hex(0xE0_66_1A),
                 other: &[6, 3, 5, 4],
             }),
         },
