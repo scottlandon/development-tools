@@ -26,7 +26,8 @@ tar xzf cc-usage-*-aarch64-apple-darwin.tar.gz
 mkdir -p ~/.local/bin && install -m 755 cc-usage-*/cc-usage ~/.local/bin/
 ```
 
-Each archive carries a signed build-provenance attestation, so you can check it was built by this repo's
+Each archive holds the binary, this README, `LICENSE` and `THIRD-PARTY-LICENSES.md` (the licence notices of the crates
+compiled into it), and carries a signed build-provenance attestation, so you can check it was built by this repo's
 release workflow from the tagged source: `gh attestation verify <archive> --repo scottlandon/development-tools`.
 
 If you download in a browser on macOS, Gatekeeper quarantines the unsigned binary; clear it with

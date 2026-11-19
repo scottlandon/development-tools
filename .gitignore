@@ -45,3 +45,6 @@ lcov.info
 # --- Scratch -------------------------------------------------------------------
 *.tmp
 *.log
+
+# --- Generated release notices (cargo-about; see about.toml) ----------------------
+THIRD-PARTY-LICENSES.md

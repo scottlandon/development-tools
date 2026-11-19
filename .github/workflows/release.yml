@@ -60,8 +60,33 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked
       - run: cargo test --workspace --locked
 
+  # Licence notices for the crates compiled into the binary (MIT and Apache-2.0 require them to ship with it).
+  # about.toml's accepted list must match deny.toml's [licenses].allow.
+  notices:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TOOL: ${{ needs.prepare.outputs.tool }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo install --locked --features cli cargo-about@0.9.3
+      - name: Generate THIRD-PARTY-LICENSES.md
+        run: |
+          cargo about generate --locked --fail -c about.toml -m "tools/$TOOL/Cargo.toml" -o THIRD-PARTY-LICENSES.md about.hbs
+          [ -s THIRD-PARTY-LICENSES.md ] || { echo "THIRD-PARTY-LICENSES.md is empty"; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: third-party-licenses
+          path: THIRD-PARTY-LICENSES.md
+          if-no-files-found: error
+
   build:
-    needs: [prepare, check]
+    needs: [prepare, check, notices]
     name: build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     permissions:
@@ -87,11 +112,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - run: rustup target add "$TARGET"
       - run: cargo build --release --locked -p "$TOOL" --target "$TARGET"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: third-party-licenses
       - name: Package
         run: |
           name="$TOOL-$VERSION-$TARGET"
           mkdir "$name"
-          cp "target/$TARGET/release/$TOOL" LICENSE "$name/"
+          cp "target/$TARGET/release/$TOOL" LICENSE THIRD-PARTY-LICENSES.md "$name/"
           cp "tools/$TOOL/README.md" "$name/"
           tar czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"

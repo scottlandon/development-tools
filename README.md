@@ -56,6 +56,7 @@ folder names, writes no files, and makes no network connections. Tests and CI en
 ├── rust-toolchain.toml dev toolchain (stable + rustfmt + clippy)
 ├── rustfmt.toml        shared formatting rules
 ├── deny.toml           dependency policy (advisories, licences, sources, no network crates)
+├── about.toml          third-party licence notices for release archives (cargo-about; template: about.hbs)
 ├── .github/            CI, release workflow, Dependabot, issue / PR templates
 └── tools/
     └── cc-usage/       one crate per tool
@@ -85,3 +86,5 @@ problems privately, as described in [SECURITY.md](SECURITY.md).
 ## License
 
 [MIT](LICENSE) © 2026 Scott Landon
+
+Release binaries include `THIRD-PARTY-LICENSES.md` for the crates compiled into them.

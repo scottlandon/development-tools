@@ -1,7 +1,7 @@
 # Supply-chain policy, checked in CI by cargo-deny: https://embarkstudios.github.io/cargo-deny/
 
 [graph]
-# Only the platforms we ship binaries for.
+# Only the platforms we ship binaries for. Keep identical to `targets` in about.toml.
 targets = [
     "aarch64-apple-darwin",
     "x86_64-apple-darwin",
@@ -21,6 +21,7 @@ ignore = [
 
 [licenses]
 # Permissive licences only. Anything else has to be added here on purpose.
+# Keep this list identical to `accepted` in about.toml (cargo-about, which builds the release notices).
 allow = [
     "MIT",
     "Apache-2.0",
