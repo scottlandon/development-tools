@@ -489,7 +489,7 @@ fn catppuccin_paints_mocha_base_with_mauve_accents() {
 #[test]
 fn light_themes_paint_their_own_ground() {
     for (id, ground) in [
-        (ThemeId::StrawberryMilk, Color::Rgb(0xFF, 0xD9, 0xDF)),
+        (ThemeId::StrawberryMilk, Color::Rgb(0xFF, 0xC2, 0xD1)),
         (ThemeId::Daylight, Color::Rgb(0xF3, 0xF0, 0xEA)),
     ] {
         let mut app = themed(id, true);

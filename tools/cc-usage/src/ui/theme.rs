@@ -181,30 +181,32 @@ fn def(id: ThemeId) -> Def {
     }
 }
 
-/// Strawberry Milk: creamy blush ground, dark cocoa lettering, strawberry-neon accent. the source palette's
-/// accent (#FF1F74) is a fill colour: it is 2.7:1 on this ground, so the text-weight accent
-/// (#A6003D) leads here, with the cream card colour as its chip lettering. Selection is the accent
-/// at 20% over the ground (hover pink is too close to the ground's own value to read).
+/// Strawberry Milk: bubblegum-pink ground (the source palette's surfaceAlt family, a notch deeper so it
+/// reads pink rather than blush), deep-berry lettering, strawberry-neon accent. the source palette's
+/// accent (#FF1F74) is a fill colour: it is 2.4:1 on this ground, so the text-weight accent
+/// (#A6003D) leads here, with the cream card colour as its chip lettering. Text, dim, border and
+/// selection are all berry/rose tones instead of brown cocoa; selection is a stronger pink than the
+/// ground (hover pink is too close to the ground's own value to read).
 fn strawberry_milk() -> Def {
     Def {
-        bg: hex(0xFF_D9_DF),
-        text: hex(0x42_1F_2A),
-        dim: hex(0x6C_39_47),
-        border: hex(0x8E_40_54),
+        bg: hex(0xFF_C2_D1),
+        text: hex(0x4A_12_29),
+        dim: hex(0x70_28_3F),
+        border: hex(0x9A_33_58),
         accent: hex(0xA6_00_3D),
         on_accent: hex(0xFF_F1_F2),
-        cost: hex(0xB4_14_43),
-        caution: hex(0x86_54_00),
-        sel_bg: hex(0xFF_B5_CA),
+        cost: hex(0xB0_12_3F),
+        caution: hex(0x7A_4A_00),
+        sel_bg: hex(0xFF_9F_BC),
         series: [
-            hex(0xE8_19_6A), // c1, FF1F74 darkened to reach 3:1 on the ground
-            hex(0x74_46_5A),
-            hex(0xA3_5F_B5),
-            hex(0x2A_80_67),
-            hex(0xD7_52_68),
-            hex(0x94_63_00), // c6, AE7A00 darkened to reach 3:1 on the ground
-            hex(0x4D_71_91),
-            hex(0xC2_3D_94),
+            hex(0xE0_10_5F), // c1, FF1F74 darkened to reach 3:1 on the ground
+            hex(0x74_30_4F),
+            hex(0x9A_4A_B0),
+            hex(0x1F_7A_60),
+            hex(0xCC_3D_5C),
+            hex(0x8A_5A_00), // c6, AE7A00 darkened to reach 3:1 on the ground
+            hex(0x45_69_8C),
+            hex(0xB8_30_8C),
         ],
     }
 }
@@ -426,8 +428,8 @@ mod tests {
     #[test]
     fn light_themes_follow_its_source_palette() {
         let p = resolve(ThemeId::StrawberryMilk, true);
-        assert_eq!(p.bg, Color::Rgb(0xFF, 0xD9, 0xDF), "blush");
-        assert_eq!(p.text, Color::Rgb(0x42, 0x1F, 0x2A), "cocoa");
+        assert_eq!(p.bg, Color::Rgb(0xFF, 0xC2, 0xD1), "bubblegum");
+        assert_eq!(p.text, Color::Rgb(0x4A, 0x12, 0x29), "berry");
         let p = resolve(ThemeId::Daylight, true);
         assert_eq!(p.bg, Color::Rgb(0xF3, 0xF0, 0xEA), "warm paper");
         assert_eq!(p.series[0], Color::Rgb(0x0D, 0x94, 0x88), "teal");

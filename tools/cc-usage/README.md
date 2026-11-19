@@ -174,7 +174,7 @@ switch 15 min / 1 h / 6 h / 24 h. It redraws every second, with a `● live` / `
 | `mainframe` (default) | Pure black, white readout, electric green accent |
 | `amber` | Warm black with amber-phosphor text |
 | `catppuccin` | [Catppuccin Mocha](https://catppuccin.com/palette) base, lavender-white text, mauve accent (palette MIT, © Catppuccin) |
-| `strawberry-milk` | Light: creamy blush ground, dark cocoa text, strawberry-pink accent |
+| `strawberry-milk` | Light: bubblegum-pink ground, deep-berry text, strawberry-pink accent |
 | `daylight` | Light: warm paper ground, teal accent |
 
 | Catppuccin | Amber |
