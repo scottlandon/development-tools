@@ -467,8 +467,8 @@ fn mainframe_chart_bars_use_each_models_family_colour() {
     let seen = bar_colours(&buf);
     let (haiku, opus) = (by_name(&app, "claude-haiku-5-5"), by_name(&app, "claude-opus-5-5"));
     assert_ne!(haiku, opus);
-    assert_eq!(haiku, Color::Rgb(0x3F, 0xE0, 0xFF), "haiku is cyan");
-    assert_eq!(opus, Color::Rgb(0xFF, 0xE1, 0x4D), "opus is yellow");
+    assert_eq!(haiku, Color::Rgb(0xC8, 0xFF, 0xD9), "haiku is pale green");
+    assert_eq!(opus, Color::Rgb(0x33, 0xFF, 0x77), "opus is mid green");
     let want: std::collections::HashSet<Color> = app
         .ds
         .models

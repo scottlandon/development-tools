@@ -167,11 +167,17 @@ mod tests {
 
     #[test]
     fn mainframe_colours_models_by_family() {
-        check_families(
-            ThemeId::Mainframe,
-            Color::Rgb(0, 0, 0),
-            [0x3F_E0_FF, 0x33_FF_77, 0xFF_E1_4D, 0xFF_4F_D8],
-        );
+        let fam = [0xC8_FF_D9, 0x7D_FF_A6, 0x33_FF_77, 0x1F_B5_52];
+        check_families(ThemeId::Mainframe, Color::Rgb(0, 0, 0), fam);
+        // All green, so depth is the cue: strictly darker from Haiku up to Fable.
+        assert!(fam.windows(2).all(|w| lum(rgb(w[0])) > lum(rgb(w[1]))), "{fam:x?}");
+        let d = ds(&FIVE);
+        let rank: Vec<u32> = (0..5).collect();
+        let old = model_color(&d, &rank, 2);
+        assert!(contrast(old, Color::Rgb(0, 0, 0)) >= 3.0, "{old:?}");
+        for i in [0, 1, 3, 4] {
+            assert_ne!(old, model_color(&d, &rank, i), "older fable vs model {i}");
+        }
     }
 
     #[test]
@@ -189,7 +195,7 @@ mod tests {
         let d = ds(&["claude-opus-4", "claude-opus-4-1", "claude-opus-4-5", "claude-opus-5-1"]);
         let rank: Vec<u32> = (0..4).collect();
         let cols: Vec<Color> = (0..4).rev().map(|i| model_color(&d, &rank, i)).collect();
-        assert_eq!(cols[0], rgb(0xFF_E1_4D));
+        assert_eq!(cols[0], rgb(0x33_FF_77));
         for w in cols.windows(2) {
             assert!(lum(w[0]) > lum(w[1]), "each older version dimmer: {w:?}");
             assert!(contrast(w[1], Color::Rgb(0, 0, 0)) >= 3.0, "{w:?}");
@@ -200,11 +206,11 @@ mod tests {
     fn mythos_shares_fables_hue_but_not_its_shade() {
         set_current(resolve(ThemeId::Mainframe, true));
         let alone = ds(&["claude-mythos-5-2"]);
-        assert_eq!(model_color(&alone, &[0], 0), rgb(0xFF_4F_D8));
+        assert_eq!(model_color(&alone, &[0], 0), rgb(0x1F_B5_52));
         let both = ds(&["claude-mythos-5-2", "claude-fable-5-2"]);
         let (m, f) = (model_color(&both, &[0, 1], 0), model_color(&both, &[0, 1], 1));
         assert_ne!(m, f);
-        assert_eq!(m, rgb(0xFF_4F_D8), "mythos sorts after fable on a version tie");
+        assert_eq!(m, rgb(0x1F_B5_52), "mythos sorts after fable on a version tie");
         assert!(lum(f) < lum(m));
     }
 
